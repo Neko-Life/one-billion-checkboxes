@@ -34,13 +34,14 @@ constexpr size_t cbmem_s = _s64 * cbsiz;
 void print_spec() {
   fprintf(stderr,
           "uint64_t_size(%zu) char_bit(%d) " A_TRILLION_STR
-          "/%lu = cbsiz(%lu)\n",
-          _s64, CHAR_BIT, _r, cbsiz);
+          "/%lu = cbsiz(%lu), cbmem_s(%zu)\n",
+          _s64, CHAR_BIT, _r, cbsiz, cbmem_s);
 }
 
 #ifdef ACTUALLY_A_TRILLION
-uint64_t *cboxes = NULL;
+static uint64_t *cboxes = NULL;
 #else
+// yes, 125MB on the data segment
 static uint64_t cboxes[cbsiz] = {0};
 #endif // ACTUALLY_A_TRILLION
 
@@ -208,21 +209,23 @@ int run(const int argc, const char *const argv[]) {
     }
   }
 
-  if (testing)
-    return test();
-
   init_main();
 
-  // constexpr int bufsiz = 4096;
-  // char buf[bufsiz] = {0};
-  // while (fgets(buf, bufsiz, stdin) != NULL) {
-  //   fprintf(stderr, "Read: `%s`\n", buf);
-  //   memset(buf, 0, sizeof(char) * bufsiz);
-  // }
+  int status = 0;
+  if (testing)
+    status = test();
+  else {
+    // constexpr int bufsiz = 4096;
+    // char buf[bufsiz] = {0};
+    // while (fgets(buf, bufsiz, stdin) != NULL) {
+    //   fprintf(stderr, "Read: `%s`\n", buf);
+    //   memset(buf, 0, sizeof(char) * bufsiz);
+    // }
+  }
 
   free_main();
 
-  return 0;
+  return status;
 }
 
 int test() {
