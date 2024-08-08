@@ -1,4 +1,6 @@
 #include "atcboxes/atcboxes.h"
+#include <cassert>
+#include <chrono>
 #include <climits>
 #include <cstdint>
 #include <cstdio>
@@ -6,6 +8,8 @@
 #include <cstring>
 #include <mutex>
 #include <threads.h>
+
+#define ARGCMP(x) strcmp(argv[i], x) == 0
 
 #ifdef ACTUALLY_A_TRILLION
 
@@ -191,26 +195,23 @@ int switch_state(uint64_t i) {
   return switch_c(c, b);
 }
 
+int test();
+
 int run(const int argc, const char *const argv[]) {
   printf("Hello World!\n");
   print_spec();
 
+  bool testing = false;
+  for (int i = 1; i < argc; i++) {
+    if (ARGCMP("test")) {
+      testing = true;
+    }
+  }
+
+  if (testing)
+    return test();
+
   init_main();
-
-#define CHECK
-#ifdef CHECK
-  size_t li = cbsiz - 1;
-  cboxes[li] = 28765284;
-  printf("%zu\n", cboxes[li]);
-  save_state("state1");
-  reset_state();
-  printf("%zu\n", cboxes[li]);
-  load_state("state1");
-  printf("%zu\n", cboxes[li]);
-
-  struct timespec t = {1, 0};
-  thrd_sleep(&t, NULL);
-#endif // CHECK
 
   // constexpr int bufsiz = 4096;
   // char buf[bufsiz] = {0};
@@ -220,6 +221,61 @@ int run(const int argc, const char *const argv[]) {
   // }
 
   free_main();
+
+  return 0;
+}
+
+int test() {
+  size_t li = cbsiz - 1;
+  // 28765284 ==
+  // 0b0000000000000000000000000000000000000001101101101110110001100100
+  // 39, 40, 42, 43, 45, 46, 48, 49, 50, 52, 53, 57, 58, 61
+  cboxes[li] = 28765284;
+  assert(cboxes[li] ==
+         0b0000000000000000000000000000000000000001101101101110110001100100);
+
+  printf("%zu\n", cboxes[li]);
+  save_state("state1");
+  reset_state();
+  printf("%zu\n", cboxes[li]);
+
+  load_state("state1");
+  printf("%zu\n", cboxes[li]);
+  assert(cboxes[li] ==
+         0b0000000000000000000000000000000000000001101101101110110001100100);
+  reset_state();
+
+  auto start =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  switch_state(999999960);
+  switch_state(999999959);
+  switch_state(999999957);
+  switch_state(999999956);
+  switch_state(999999954);
+  switch_state(999999953);
+  switch_state(999999951);
+  switch_state(999999950);
+  switch_state(999999949);
+  switch_state(999999947);
+  switch_state(999999946);
+  switch_state(999999942);
+  switch_state(999999941);
+  switch_state(999999938);
+  assert(cboxes[li] ==
+         0b0000000000000000000000000000000000000001101101101110110001100100);
+  switch_state(999999938);
+  assert(cboxes[li] ==
+         0b0000000000000000000000000000000000000001101101101110110001100000);
+  switch_state(999999938);
+  auto end =
+      std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  printf("took %lld picosecond\n", end - start);
+
+  assert(cboxes[li] ==
+         0b0000000000000000000000000000000000000001101101101110110001100100);
+
+  struct timespec t = {1, 0};
+  thrd_sleep(&t, NULL);
 
   return 0;
 }
