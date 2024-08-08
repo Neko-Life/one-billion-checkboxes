@@ -34,7 +34,12 @@ void print_spec() {
           _s64, CHAR_BIT, _r, cbsiz);
 }
 
+#ifdef ACTUALLY_A_TRILLION
+uint64_t *cboxes = NULL;
+#else
 static uint64_t cboxes[cbsiz] = {0};
+#endif // ACTUALLY_A_TRILLION
+
 std::mutex cb_m;
 
 FILE *try_open(const char *filepath, const char *mode) {
@@ -45,6 +50,31 @@ FILE *try_open(const char *filepath, const char *mode) {
   }
 
   return f;
+}
+
+void init_main() {
+#ifdef ACTUALLY_A_TRILLION
+  fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
+  cboxes = (uint64_t *)malloc(cbmem_s);
+
+  if (!cboxes) {
+    // dont have enough ram? die
+    perror("[init_main FATAL]");
+    exit(1);
+  }
+#endif // ACTUALLY_A_TRILLION
+}
+
+void free_main() {
+#ifdef ACTUALLY_A_TRILLION
+  if (!cboxes) {
+    fprintf(stderr, "[free_main ERROR] State freed\n");
+    return;
+  }
+
+  free(cboxes);
+  cboxes = NULL;
+#endif // ACTUALLY_A_TRILLION
 }
 
 int load_state(const char *filepath) {
@@ -165,6 +195,8 @@ int run(const int argc, const char *const argv[]) {
   printf("Hello World!\n");
   print_spec();
 
+  init_main();
+
 #define CHECK
 #ifdef CHECK
   size_t li = cbsiz - 1;
@@ -186,6 +218,8 @@ int run(const int argc, const char *const argv[]) {
   //   fprintf(stderr, "Read: `%s`\n", buf);
   //   memset(buf, 0, sizeof(char) * bufsiz);
   // }
+
+  free_main();
 
   return 0;
 }
