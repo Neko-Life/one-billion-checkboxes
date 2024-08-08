@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <threads.h>
 
 namespace atcboxes {
@@ -12,6 +13,7 @@ constexpr size_t _s64 = sizeof(uint64_t);
 constexpr size_t _r = _s64 * CHAR_BIT;
 
 constexpr size_t cbsiz = 1'000'000'000 / _r;
+constexpr size_t cbmem_s = _s64 * cbsiz;
 
 void print_spec() {
   fprintf(
@@ -21,6 +23,7 @@ void print_spec() {
 }
 
 static uint64_t cboxes[cbsiz] = {0};
+std::mutex cb_m;
 
 FILE *try_open(const char *filepath, const char *mode) {
   FILE *f = fopen(filepath, mode);
@@ -33,6 +36,8 @@ FILE *try_open(const char *filepath, const char *mode) {
 }
 
 int load_state(const char *filepath) {
+  std::lock_guard lk(cb_m);
+
   FILE *f = try_open(filepath, "rb");
   int status = 0;
 
@@ -56,7 +61,7 @@ int load_state(const char *filepath) {
       fprintf(stderr, "[load_state ERROR] Corrupted state file (synched != "
                       "read), exiting\n");
 
-      exit(1);
+      exit(2);
     }
 
     total_el += read;
@@ -69,7 +74,7 @@ int load_state(const char *filepath) {
     fprintf(stderr, "[load_state ERROR] Corrupted state file (total_el != "
                     "cbsiz), exiting\n");
 
-    exit(2);
+    exit(3);
   }
 
   fprintf(stderr, "[load_state] Loaded state `%s`\n", filepath);
@@ -81,6 +86,8 @@ int load_state(const char *filepath) {
 }
 
 int save_state(const char *filepath) {
+  std::lock_guard lk(cb_m);
+
   FILE *f = try_open(filepath, "wb");
   int status = 0;
 
@@ -104,35 +111,69 @@ int save_state(const char *filepath) {
 }
 
 int reset_state() {
-  constexpr size_t _s = _s64 * cbsiz;
-  memset(cboxes, 0, _s);
+  std::lock_guard lk(cb_m);
+
+  memset(cboxes, 0, cbmem_s);
 
   fprintf(stderr, "[reset_state] State resetted\n");
 
   return 0;
 }
 
+/**
+ * @param c column (index)
+ * @param bit zero based (0-63)
+ */
+int switch_c(size_t c, short bit) {
+  constexpr size_t max_idx = cbsiz - 1;
+  if (c > max_idx)
+    return 1;
+
+  uint64_t b = 1 << bit;
+
+  std::lock_guard lk(cb_m);
+
+  cboxes[c] = cboxes[c] & b ? cboxes[c] & (~b) // remove if had it
+                            : cboxes[c] | b;   // else add
+
+  return 0;
+}
+
+/**
+ * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ */
+int switch_state(uint64_t i) {
+  size_t c = i > 0 ? i / 64 : 0;
+  short b = i > 0 ? i % 64 : 0;
+
+  return switch_c(c, b);
+}
+
 int run(const int argc, const char *const argv[]) {
   printf("Hello World!\n");
+  print_spec();
 
-  // size_t li = cbsiz - 1;
-  // cboxes[li] = 28765284;
-  // printf("%zu\n", cboxes[li]);
-  // save_state("state1");
-  // reset_state();
-  // printf("%zu\n", cboxes[li]);
-  // load_state("state1");
-  // printf("%zu\n", cboxes[li]);
+#define CHECK
+#ifdef CHECK
+  size_t li = cbsiz - 1;
+  cboxes[li] = 28765284;
+  printf("%zu\n", cboxes[li]);
+  save_state("state1");
+  reset_state();
+  printf("%zu\n", cboxes[li]);
+  load_state("state1");
+  printf("%zu\n", cboxes[li]);
 
-  // struct timespec t = {1, 0};
-  // thrd_sleep(&t, NULL);
+  struct timespec t = {1, 0};
+  thrd_sleep(&t, NULL);
+#endif // CHECK
 
-  constexpr int bufsiz = 4096;
-  char buf[bufsiz] = {0};
-  while (fgets(buf, bufsiz, stdin) != NULL) {
-    fprintf(stderr, "Read: `%s`\n", buf);
-    memset(buf, 0, sizeof(char) * bufsiz);
-  }
+  // constexpr int bufsiz = 4096;
+  // char buf[bufsiz] = {0};
+  // while (fgets(buf, bufsiz, stdin) != NULL) {
+  //   fprintf(stderr, "Read: `%s`\n", buf);
+  //   memset(buf, 0, sizeof(char) * bufsiz);
+  // }
 
   return 0;
 }
