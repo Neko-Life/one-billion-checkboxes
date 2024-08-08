@@ -43,7 +43,7 @@ int load_state(const char *filepath) {
   uint64_t temp[bufsiz] = {0};
 
   size_t total_el = 0;
-  size_t read = 0;
+  ssize_t read = 0;
   while ((read = fread(temp, _s64, bufsiz, f)) > 0) {
     size_t synched = 0;
     for (size_t i = 0; i < read && (i + total_el) < cbsiz; i++) {
@@ -82,16 +82,25 @@ int load_state(const char *filepath) {
 
 int save_state(const char *filepath) {
   FILE *f = try_open(filepath, "wb");
+  int status = 0;
+
   if (!f)
     return -1;
 
-  size_t wrote = fwrite(cboxes, _s64, cbsiz, f);
+  ssize_t wrote = fwrite(cboxes, _s64, cbsiz, f);
   fprintf(stderr, "[save_state] Wrote %zu elements to `%s`\n", wrote, filepath);
+
+  if (wrote != cbsiz) {
+    fprintf(stderr, "[save_state ERROR] Failed saving state to `%s`\n",
+            filepath);
+
+    status = 1;
+  }
 
   fclose(f);
   f = NULL;
 
-  return 0;
+  return status;
 }
 
 int reset_state() {
@@ -117,6 +126,13 @@ int run(const int argc, const char *const argv[]) {
 
   // struct timespec t = {1, 0};
   // thrd_sleep(&t, NULL);
+
+  constexpr int bufsiz = 4096;
+  char buf[bufsiz] = {0};
+  while (fgets(buf, bufsiz, stdin) != NULL) {
+    fprintf(stderr, "Read: `%s`\n", buf);
+    memset(buf, 0, sizeof(char) * bufsiz);
+  }
 
   return 0;
 }
