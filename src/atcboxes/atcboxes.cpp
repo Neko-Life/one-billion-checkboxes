@@ -7,19 +7,31 @@
 #include <mutex>
 #include <threads.h>
 
+#ifdef ACTUALLY_A_TRILLION
+
+#define A_TRILLION 1'000'000'000'000
+#define A_TRILLION_STR "1'000'000'000'000"
+
+#else
+
+#define A_TRILLION 1'000'000'000
+#define A_TRILLION_STR "1'000'000'000"
+
+#endif // ACTUALLY_A_TRILLION
+
 namespace atcboxes {
 
 constexpr size_t _s64 = sizeof(uint64_t);
 constexpr size_t _r = _s64 * CHAR_BIT;
 
-constexpr size_t cbsiz = 1'000'000'000 / _r;
+constexpr size_t cbsiz = A_TRILLION / _r;
 constexpr size_t cbmem_s = _s64 * cbsiz;
 
 void print_spec() {
-  fprintf(
-      stderr,
-      "uint64_t_size(%zu) char_bit(%d) 1'000'000'000'000/%lu = cbsiz(%lu)\n",
-      _s64, CHAR_BIT, _r, cbsiz);
+  fprintf(stderr,
+          "uint64_t_size(%zu) char_bit(%d) " A_TRILLION_STR
+          "/%lu = cbsiz(%lu)\n",
+          _s64, CHAR_BIT, _r, cbsiz);
 }
 
 static uint64_t cboxes[cbsiz] = {0};

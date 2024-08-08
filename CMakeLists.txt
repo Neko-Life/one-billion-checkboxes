@@ -6,6 +6,8 @@ project(atcboxes
 	DESCRIPTION "A Trillion Checkboxes - Web App")
 
 option(DEBUG_SYMBOL "Build ${PROJECT_NAME} with debug symbol" ON)
+option(ACTUALLY_A_TRILLION "Build ${PROJECT_NAME} with actually a TRILLION checkbox state" OFF)
+
 set(PROJ_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
 
@@ -60,6 +62,14 @@ if (DEBUG_SYMBOL)
 	message("-- INFO: Will build ${PROJECT_NAME} with debug symbol")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
+
+if (ACTUALLY_A_TRILLION)
+	message("-- INFO: Will build ${PROJECT_NAME} with a TRILLION checkbox state")
+	target_compile_definitions(${PROJECT_NAME} PUBLIC ACTUALLY_A_TRILLION)
+else()
+	message("-- INFO: Will build ${PROJECT_NAME} with a BILLION checkbox state")
+endif()
+
 
 target_link_libraries(${PROJECT_NAME}
 	${USOCKETS_OBJECT_FILES}
