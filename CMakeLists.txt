@@ -79,6 +79,7 @@ target_link_libraries(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	include
+	libs
 	libs/uWebSockets/uSockets/src
 	# libs/jwt-cpp/include
 	)
