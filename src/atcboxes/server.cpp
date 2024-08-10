@@ -23,6 +23,7 @@ App *_app_ptr = nullptr;
 uWS::Loop *_loop_ptr = nullptr;
 std::atomic<bool> shutting_down = false;
 std::atomic<int> status = 0;
+std::atomic<int> int_count = 0;
 
 long long get_current_ts() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -35,6 +36,14 @@ void on_sigint(int) {
   constexpr size_t msgsiz = (sizeof(msg) / sizeof(*msg)) - 1;
   write(STDIN_FILENO, msg, msgsiz);
   shutdown();
+
+  int_count++;
+  if (int_count >= 5) {
+    constexpr char msg2[] = "Received 5 SIGINT\nHard exiting...";
+    constexpr size_t msgsiz2 = (sizeof(msg2) / sizeof(*msg2)) - 1;
+    write(STDIN_FILENO, msg2, msgsiz2);
+    exit(-1);
+  }
 }
 
 std::pair<int64_t, int64_t> get_subs_pc(const std::string &s) {
