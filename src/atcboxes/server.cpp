@@ -126,6 +126,7 @@ ws_list_t::iterator find_cws(WS *ws) {
   while (i != connected_wses.end()) {
     if (*i == ws)
       return i;
+    i++;
   }
 
   return connected_wses.end();
@@ -161,6 +162,7 @@ int run() {
 
     ws->subscribe("global");
     increment_user_count(ws);
+    send_user_count(ws);
   };
 
   behavior.close = [](WS *ws, int code, std::string_view msg) {
