@@ -12,6 +12,10 @@
 
 #define STATE_FILE "state.atcb"
 
+#define ARGV_LOOP(x)                                                           \
+  for (int i = 1; i < argc; i++)                                               \
+  x
+
 #define ARGCMP(x) strcmp(argv[i], x) == 0
 
 #ifdef ACTUALLY_A_TRILLION
@@ -266,11 +270,14 @@ int run(const int argc, const char *const argv[]) {
   print_spec();
 
   bool testing = false;
-  for (int i = 1; i < argc; i++) {
+  ARGV_LOOP({
     if (ARGCMP("test")) {
       testing = true;
     }
-  }
+    /*
+       if (ARGCMP("")) {
+       } */
+  })
 
   init_main();
 

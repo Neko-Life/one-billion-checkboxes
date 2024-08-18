@@ -12,7 +12,14 @@ namespace atcboxes::server {
 
 using App = uWS::App;
 
+enum ws_data_flags_e : long { WSDF_NONE = 0, WSDF_C = 1 };
+
 struct ws_data_t {
+  char n_o;
+  char n_i;
+  long flags;
+  std::string cached;
+
   long long last_ts;
   // int inv_p;
 };
@@ -29,6 +36,10 @@ long long get_current_ts() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::high_resolution_clock::now().time_since_epoch())
       .count();
+}
+
+long long get_current_ts_seed() {
+  return std::chrono::high_resolution_clock::now().time_since_epoch().count();
 }
 
 void on_sigint(int) {
@@ -65,6 +76,39 @@ std::pair<int64_t, int64_t> get_subs_pc(const std::string &s) {
   return {std::stoll(p), std::stoll(c)};
 }
 
+int get_rand() {
+  srand(get_current_ts_seed());
+  return rand();
+}
+
+int get_rand_modulo(size_t mod, size_t thres = 0) {
+  size_t r = get_rand();
+  return r > thres ? r % mod : r;
+}
+
+constexpr const char alphanums[] =
+    "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=_";
+constexpr const size_t apn_siz = (sizeof(alphanums) / sizeof(*alphanums)) - 1;
+
+char get_rand_char() {
+  int rs = get_rand_modulo(apn_siz, apn_siz);
+  return alphanums[rs];
+}
+
+void rand_chars(char *__restrict p, size_t len) {
+  int pd = len <= 3 ? 1 : 3;
+  for (size_t i = 0; i < (len - pd); i++) {
+    p[i] = get_rand_char();
+  }
+
+  if (pd == 3) {
+    p[len - 3] = '=';
+    p[len - 2] = '=';
+  }
+
+  p[len - 1] = '\0';
+}
+
 int subs(const std::string &s) {
   auto pc = get_subs_pc(s);
 
@@ -82,8 +126,28 @@ int gcv(const std::string &s) {
   return idx > 0 ? r : -1;
 }
 
+void inc(WS *ws, std::string_view data) {
+  auto *ud = ws->getUserData();
+  ud->n_i++;
+  if (ud->n_i > ud->n_o) {
+    ud->n_i = 0;
+
+    ud->cached = std::string(data);
+  }
+
+  printf("n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o, ud->n_i,
+         ud->cached.c_str(), std::string(data).c_str());
+}
+
+void ws_send(WS *ws, std::string_view msg) {
+  ws->send(msg);
+
+  inc(ws, msg);
+}
+
 void publish_global(WS *ws, std::string_view data) {
   ws->publish("global", data);
+  // inc(ws, data);
 }
 
 std::string p_state(const std::string &n, int s) {
@@ -158,6 +222,9 @@ int run() {
     auto *ud = ws->getUserData();
 
     // ud->inv_p = 0;
+    ud->n_o = 4;
+    ud->n_i = 0;
+    ud->flags = WSDF_NONE;
     ud->last_ts = get_current_ts();
 
     ws->subscribe("global");
@@ -182,6 +249,16 @@ int run() {
     auto *ud = ws->getUserData();
 
     try {
+      if (ud->flags & WSDF_C) {
+        if (!ud->cached.empty() && msg != ud->cached) {
+          ws_end(ws, 69);
+          return;
+        }
+
+        ud->flags &= (~WSDF_C);
+        return;
+      }
+
       if (msg.find("sc;") == 0) {
         if (msg.length() < 6 || subs(std::string(msg.substr(3))) == -1) {
           ws_end(ws, 69);
@@ -198,7 +275,21 @@ int run() {
           return;
         }
 
-        ws->send(p_state(n, s));
+        if (s)
+          ws->send(p_state(n, s));
+      }
+
+      else if (msg.find("gcvr;") == 0) {
+        // int s = 0;
+        // auto n = std::string(msg.substr(5));
+
+        // if (msg.length() < 6 || (s = gcvr(n)) == -1) {
+        //   ws_end(ws, 69);
+        //   return;
+        // }
+
+        // if (s)
+        //   ws->send(p_state(n, s));
       }
 
       else if (msg.find("gv;") == 0) {
@@ -207,7 +298,7 @@ int run() {
           return;
         }
 
-        ws->send(p_gv());
+        ws_send(ws, p_gv());
       }
 
       else {
@@ -220,7 +311,31 @@ int run() {
 
         publish_global(ws, p_state(std::string(msg), r));
 
-        ud->last_ts = get_current_ts();
+        const long long cur = get_current_ts();
+        if ((cur - ud->last_ts) < 50) {
+          srand(cur);
+          int rs = get_rand_modulo(2);
+          if (rs) {
+            ws_send(ws, "l;");
+            char b[3];
+            rand_chars(b, 3);
+            int n = get_rand_modulo(10);
+            ud->n_o = n > 0 ? n : ud->n_o;
+            ws_send(ws, std::string(b) + std::to_string(n));
+          }
+
+          while (ud->n_i != 0) {
+            char b[9];
+            rand_chars(b, 9);
+            ws_send(ws, std::string(b));
+          }
+
+          ws_send(ws, "h;");
+
+          ud->flags |= WSDF_C;
+        }
+
+        ud->last_ts = cur;
       }
     } catch (...) {
       ws_end(ws, 420);
