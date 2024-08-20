@@ -58,6 +58,8 @@ uint64_t gv = 0;
 std::mutex cb_m;
 std::mutex gv_m;
 
+cbox_lock_guard_t::cbox_lock_guard_t() : lk(cb_m) {}
+
 FILE *try_open(const char *filepath, const char *mode) {
   FILE *f = fopen(filepath, mode);
   if (!f) {
@@ -233,6 +235,16 @@ int get_state(uint64_t i) {
   auto cb = get_cb(i);
 
   return get_cv(cb.first, cb.second);
+}
+
+std::pair<uint64_t const *, size_t> get_state_page(uint64_t page) {
+  constexpr const size_t el_per_page = SIZE_PER_PAGE / _r;
+  constexpr const size_t max_page = (A_TRILLION / SIZE_PER_PAGE) - 1;
+
+  if (page > max_page)
+    return {NULL, 0};
+
+  return {cboxes + (page * el_per_page), el_per_page};
 }
 
 void init_main() {

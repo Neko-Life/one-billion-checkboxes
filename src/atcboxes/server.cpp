@@ -126,6 +126,16 @@ int gcv(const std::string &s) {
   return idx > 0 ? r : -1;
 }
 
+std::pair<uint64_t const *, size_t> gp(const std::string &s) {
+  size_t idx = 0;
+  uint64_t p = std::stoull(s, &idx);
+  if (idx == 0) {
+    return {NULL, 0};
+  }
+
+  return get_state_page(p);
+}
+
 void inc(WS *ws, std::string_view data) {
   auto *ud = ws->getUserData();
   ud->n_i++;
@@ -279,17 +289,25 @@ int run() {
           ws->send(p_state(n, s));
       }
 
-      else if (msg.find("gcvr;") == 0) {
-        // int s = 0;
-        // auto n = std::string(msg.substr(5));
+      else if (msg.find("gp;") == 0) {
+        // calling get_state_page in gp should lock cbox mutex
+        atcboxes::cbox_lock_guard_t lk;
 
-        // if (msg.length() < 6 || (s = gcvr(n)) == -1) {
-        //   ws_end(ws, 69);
-        //   return;
-        // }
+        std::pair<uint64_t const *, size_t> s = {NULL, 0};
 
-        // if (s)
-        //   ws->send(p_state(n, s));
+        if (msg.length() < 4 ||
+            (s = gp(std::string(msg.substr(3)))).first == NULL) {
+          ws_end(ws, 69);
+          return;
+        }
+
+        if (s.first) {
+          constexpr const size_t conversion = sizeof(uint64_t);
+
+          ws->send(std::string("e;\n") +
+                   std::string((const char *)s.first, s.second * conversion));
+        }
+
       }
 
       else if (msg.find("gv;") == 0) {

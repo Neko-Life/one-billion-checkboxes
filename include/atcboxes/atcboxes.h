@@ -2,6 +2,10 @@
 #define ATCBOXES_H
 
 #include <cstdint>
+#include <mutex>
+
+#define SIZE_PER_PAGE 1'000'000
+
 namespace atcboxes {
 
 // unused for now, i havent even start the frontend
@@ -9,6 +13,13 @@ struct cbox_t {
   uint8_t r;
   uint8_t g;
   uint8_t b;
+};
+
+struct cbox_lock_guard_t {
+  std::lock_guard<std::mutex> lk;
+
+  cbox_lock_guard_t();
+  ~cbox_lock_guard_t() = default;
 };
 
 uint64_t get_gv();
@@ -24,6 +35,13 @@ int switch_state(uint64_t i);
  * @return 0 off, 1 on, -1 err
  */
 int get_state(uint64_t i);
+
+/**
+ * @brief Caller should lock cbox mutex by constructing cbox_lock_guard_t before
+ *        calling this function and keeping it alive as long as the return value
+ *        is gonna be used.
+ */
+std::pair<uint64_t const *, size_t> get_state_page(uint64_t page);
 
 int run(const int argc, const char *const argv[]);
 
