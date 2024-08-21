@@ -294,16 +294,16 @@ int run() {
         atcboxes::cbox_lock_guard_t lk;
 
         std::pair<uint64_t const *, size_t> s = {NULL, 0};
+        std::string page_number(msg.substr(3));
 
-        if (msg.length() < 4 ||
-            (s = gp(std::string(msg.substr(3)))).first == NULL) {
+        if (msg.length() < 4 || (s = gp(page_number)).first == NULL) {
           ws_end(ws, 69);
           return;
         }
 
         if (s.first) {
           constexpr const size_t conversion = sizeof(uint64_t);
-
+          ws_send(ws, std::string("ws;") + page_number);
           ws->send(std::string("e;\n") +
                    std::string((const char *)s.first, s.second * conversion));
         }
