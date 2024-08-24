@@ -330,7 +330,7 @@ int run() {
         publish_global(ws, p_state(std::string(msg), r));
 
         const long long cur = get_current_ts();
-        if ((cur - ud->last_ts) < 50) {
+        if ((cur - ud->last_ts) < 60) {
           srand(cur);
           int rs = get_rand_modulo(2);
           if (rs) {
