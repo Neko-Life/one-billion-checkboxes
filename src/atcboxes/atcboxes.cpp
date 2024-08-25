@@ -1,4 +1,5 @@
 #include "atcboxes/atcboxes.h"
+#include "atcboxes/runtime_cli.h"
 #include "atcboxes/server.h"
 #include <cassert>
 #include <chrono>
@@ -10,25 +11,11 @@
 #include <mutex>
 #include <threads.h>
 
-#define STATE_FILE "state.atcb"
-
 #define ARGV_LOOP(x)                                                           \
   for (int i = 1; i < argc; i++)                                               \
   x
 
 #define ARGCMP(x) strcmp(argv[i], x) == 0
-
-#ifdef ACTUALLY_A_TRILLION
-
-#define A_TRILLION 1'000'000'000'000
-#define A_TRILLION_STR "1'000'000'000'000"
-
-#else
-
-#define A_TRILLION 1'000'000'000
-#define A_TRILLION_STR "1'000'000'000"
-
-#endif // ACTUALLY_A_TRILLION
 
 namespace atcboxes {
 
@@ -39,7 +26,7 @@ constexpr size_t cbsiz = A_TRILLION / _r;
 constexpr size_t max_idx = cbsiz - 1;
 constexpr size_t cbmem_s = _s64 * cbsiz;
 
-void print_spec() {
+static void print_spec() {
   fprintf(stderr,
           "uint64_t_size(%zu) char_bit(%d) " A_TRILLION_STR
           "/%lu = cbsiz(%lu), cbmem_s(%zu)\n",
@@ -60,7 +47,7 @@ std::mutex gv_m;
 
 cbox_lock_guard_t::cbox_lock_guard_t() : lk(cb_m) {}
 
-FILE *try_open(const char *filepath, const char *mode) {
+static FILE *try_open(const char *filepath, const char *mode) {
   FILE *f = fopen(filepath, mode);
   if (!f) {
     perror("[try_open ERROR]");
@@ -70,13 +57,7 @@ FILE *try_open(const char *filepath, const char *mode) {
   return f;
 }
 
-uint64_t get_gv() {
-  std::lock_guard lj(gv_m);
-
-  return gv;
-}
-
-int load_state(const char *filepath) {
+static int load_state(const char *filepath) {
   fprintf(stderr, "[load_state] Loading `%s`\n", filepath);
 
   std::lock_guard lk(cb_m);
@@ -138,7 +119,7 @@ int load_state(const char *filepath) {
   return status;
 }
 
-int save_state(const char *filepath) {
+static int save_state(const char *filepath) {
   std::lock_guard lk(cb_m);
 
   FILE *f = try_open(filepath, "wb");
@@ -163,7 +144,7 @@ int save_state(const char *filepath) {
   return status;
 }
 
-int reset_state() {
+static int reset_state() {
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
 
@@ -180,7 +161,7 @@ int reset_state() {
  * @param bit zero based (0-63)
  * @return 0 off, 1 on, -1 err
  */
-int switch_c(size_t c, short bit) {
+static int switch_c(size_t c, short bit) {
   if (c > max_idx)
     return -1;
 
@@ -199,14 +180,14 @@ int switch_c(size_t c, short bit) {
   return ret;
 }
 
-std::pair<size_t, short> get_cb(uint64_t i) {
+static std::pair<size_t, short> get_cb(uint64_t i) {
   size_t c = i > 0 ? i / 64 : 0;
   short b = i > 0 ? i % 64 : 0;
 
   return {c, b};
 }
 
-int get_cv(size_t c, short bit) {
+static int get_cv(size_t c, short bit) {
   if (c > max_idx)
     return -1;
 
@@ -215,6 +196,40 @@ int get_cv(size_t c, short bit) {
   std::lock_guard lk(cb_m);
 
   return (cboxes[c] & b) ? 1 : 0;
+}
+
+static void init_main() {
+#ifdef ACTUALLY_A_TRILLION
+  fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
+  cboxes = (uint64_t *)malloc(cbmem_s);
+
+  if (!cboxes) {
+    // dont have enough ram? die
+    perror("[init_main FATAL]");
+    exit(1);
+  }
+#endif // ACTUALLY_A_TRILLION
+
+  load_state(STATE_FILE);
+}
+
+static void free_main() {
+#ifdef ACTUALLY_A_TRILLION
+  if (!cboxes) {
+    fprintf(stderr, "[free_main ERROR] State freed\n");
+    return;
+  }
+
+  free(cboxes);
+  cboxes = NULL;
+#endif // ACTUALLY_A_TRILLION
+  save_state(STATE_FILE);
+}
+
+uint64_t get_gv() {
+  std::lock_guard lj(gv_m);
+
+  return gv;
 }
 
 /**
@@ -249,34 +264,6 @@ std::pair<uint64_t const *, size_t> get_state_page(uint64_t page) {
   return {cboxes + (page * el_per_page), el_per_page};
 }
 
-void init_main() {
-#ifdef ACTUALLY_A_TRILLION
-  fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
-  cboxes = (uint64_t *)malloc(cbmem_s);
-
-  if (!cboxes) {
-    // dont have enough ram? die
-    perror("[init_main FATAL]");
-    exit(1);
-  }
-#endif // ACTUALLY_A_TRILLION
-
-  load_state(STATE_FILE);
-}
-
-void free_main() {
-#ifdef ACTUALLY_A_TRILLION
-  if (!cboxes) {
-    fprintf(stderr, "[free_main ERROR] State freed\n");
-    return;
-  }
-
-  free(cboxes);
-  cboxes = NULL;
-#endif // ACTUALLY_A_TRILLION
-  save_state(STATE_FILE);
-}
-
 int test();
 
 int run(const int argc, const char *const argv[]) {
@@ -299,10 +286,12 @@ int run(const int argc, const char *const argv[]) {
   if (testing)
     status = test();
   else {
+    runtime_cli::run();
     status = server::run();
   }
 
   free_main();
+  runtime_cli::shutdown();
 
   return status;
 }

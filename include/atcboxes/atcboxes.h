@@ -6,6 +6,20 @@
 
 #define SIZE_PER_PAGE 1'000'000
 
+#define STATE_FILE "state.atcb"
+
+#ifdef ACTUALLY_A_TRILLION
+
+#define A_TRILLION 1'000'000'000'000
+#define A_TRILLION_STR "1'000'000'000'000"
+
+#else
+
+#define A_TRILLION 1'000'000'000
+#define A_TRILLION_STR "1'000'000'000"
+
+#endif // ACTUALLY_A_TRILLION
+
 namespace atcboxes {
 
 // unused for now, i havent even start the frontend

@@ -1,9 +1,9 @@
 #include "atcboxes/server.h"
 #include "atcboxes/atcboxes.h"
+#include "atcboxes/commands.h"
 #include "uWebSockets/src/App.h"
 #include <csignal>
 #include <cstdint>
-#include <regex>
 #include <string>
 
 #define PORT 3000
@@ -32,17 +32,17 @@ std::atomic<bool> shutting_down = false;
 std::atomic<int> status = 0;
 std::atomic<int> int_count = 0;
 
-long long get_current_ts() {
+static long long get_current_ts() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::high_resolution_clock::now().time_since_epoch())
       .count();
 }
 
-long long get_current_ts_seed() {
+static long long get_current_ts_seed() {
   return std::chrono::high_resolution_clock::now().time_since_epoch().count();
 }
 
-void on_sigint(int) {
+static void on_sigint(int) {
   constexpr char msg[] = "Received SIGINT\n";
   constexpr size_t msgsiz = (sizeof(msg) / sizeof(*msg)) - 1;
   write(STDIN_FILENO, msg, msgsiz);
@@ -57,31 +57,12 @@ void on_sigint(int) {
   }
 }
 
-std::pair<int64_t, int64_t> get_subs_pc(const std::string &s) {
-  std::regex word_regex("(\\d+)");
-  auto begin = std::sregex_iterator(s.begin(), s.end(), word_regex);
-
-  auto end = std::sregex_iterator();
-  if (begin == end)
-    return {-1, -1};
-
-  std::string p = (*begin).str();
-  begin++;
-
-  if (begin == end)
-    return {-1, -1};
-
-  std::string c = (*begin).str();
-
-  return {std::stoll(p), std::stoll(c)};
-}
-
-int get_rand() {
+static int get_rand() {
   srand(get_current_ts_seed());
   return rand();
 }
 
-int get_rand_modulo(size_t mod, size_t thres = 0) {
+static int get_rand_modulo(size_t mod, size_t thres = 0) {
   size_t r = get_rand();
   return r > thres ? r % mod : r;
 }
@@ -90,12 +71,12 @@ constexpr const char alphanums[] =
     "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=_";
 constexpr const size_t apn_siz = (sizeof(alphanums) / sizeof(*alphanums)) - 1;
 
-char get_rand_char() {
+static char get_rand_char() {
   int rs = get_rand_modulo(apn_siz, apn_siz);
   return alphanums[rs];
 }
 
-void rand_chars(char *__restrict p, size_t len) {
+static void rand_chars(char *__restrict p, size_t len) {
   int pd = len <= 3 ? 1 : 3;
   for (size_t i = 0; i < (len - pd); i++) {
     p[i] = get_rand_char();
@@ -109,34 +90,7 @@ void rand_chars(char *__restrict p, size_t len) {
   p[len - 1] = '\0';
 }
 
-int subs(const std::string &s) {
-  auto pc = get_subs_pc(s);
-
-  if (pc.first == -1 || pc.second == -1)
-    return -1;
-
-  // !TODO: subs per page
-
-  return 0;
-}
-
-int gcv(const std::string &s) {
-  size_t idx = 0;
-  int r = get_state(std::stoull(s, &idx));
-  return idx > 0 ? r : -1;
-}
-
-std::pair<uint64_t const *, size_t> gp(const std::string &s) {
-  size_t idx = 0;
-  uint64_t p = std::stoull(s, &idx);
-  if (idx == 0) {
-    return {NULL, 0};
-  }
-
-  return get_state_page(p);
-}
-
-void inc(WS *ws, std::string_view data) {
+static void inc(WS *ws, std::string_view data) {
   auto *ud = ws->getUserData();
   ud->n_i++;
   if (ud->n_i > ud->n_o) {
@@ -149,42 +103,36 @@ void inc(WS *ws, std::string_view data) {
          ud->cached.c_str(), std::string(data).c_str());
 }
 
-void ws_send(WS *ws, std::string_view msg) {
+static void ws_send(WS *ws, std::string_view msg) {
   ws->send(msg);
 
   inc(ws, msg);
 }
 
-void publish_global(WS *ws, std::string_view data) {
+static void publish_global(WS *ws, std::string_view data) {
   ws->publish("global", data);
   // inc(ws, data);
 }
 
-std::string p_state(const std::string &n, int s) {
-  return "s;" + n + ';' + (s ? "1" : "0");
-}
-
-std::string p_gv() { return "v;" + std::to_string(get_gv()); }
-
 uint64_t uc = 0;
 
-std::string p_uc() { return std::string("uc;") + std::to_string(uc); }
+static std::string p_uc() { return std::string("uc;") + std::to_string(uc); }
 
-void publish_user_count(WS *ws) { publish_global(ws, p_uc()); }
+static void publish_user_count(WS *ws) { publish_global(ws, p_uc()); }
 
-void send_user_count(WS *ws) { ws->send(p_uc()); }
+static void send_user_count(WS *ws) { ws->send(p_uc()); }
 
-void increment_user_count(WS *ws) {
+static void increment_user_count(WS *ws) {
   uc++;
   publish_user_count(ws);
 }
 
-void decrement_user_count(WS *ws) {
+static void decrement_user_count(WS *ws) {
   uc--;
   publish_user_count(ws);
 }
 
-void ws_end(WS *ws, int code = 0, std::string_view msg = {}) {
+static void ws_end(WS *ws, int code = 0, std::string_view msg = {}) {
   // decrement_user_count(ws);
   ws->end(code, msg);
 }
@@ -192,7 +140,7 @@ void ws_end(WS *ws, int code = 0, std::string_view msg = {}) {
 using ws_list_t = std::vector<WS *>;
 ws_list_t connected_wses;
 
-ws_list_t::iterator find_cws(WS *ws) {
+static ws_list_t::iterator find_cws(WS *ws) {
   if (connected_wses.empty())
     return connected_wses.end();
 
@@ -206,18 +154,33 @@ ws_list_t::iterator find_cws(WS *ws) {
   return connected_wses.end();
 }
 
-void add_cws(WS *ws) {
+static void add_cws(WS *ws) {
   if (find_cws(ws) != connected_wses.end())
     return;
   connected_wses.push_back(ws);
 }
 
-void remove_cws(WS *ws) {
+static void remove_cws(WS *ws) {
   auto i = find_cws(ws);
   if (i == connected_wses.end())
     return;
 
   connected_wses.erase(i);
+}
+
+static void handle_ws_command_outs(WS *ws, commands::command_outs_t &out) {
+  for (const auto &i : out) {
+    if (i.flags & 1) {
+      ws->send(i.out);
+    } else if ((i.flags & 1) == 0) {
+      ws_send(ws, i.out);
+    } else {
+      fprintf(stderr,
+              "[server::handle_ws_command_outs ERROR] Unknown command_out_t "
+              "flags: %zu\nout: `%s`",
+              i.flags, i.out.c_str());
+    }
+  }
 }
 
 int run() {
@@ -269,55 +232,19 @@ int run() {
         return;
       }
 
-      if (msg.find("sc;") == 0) {
-        if (msg.length() < 6 || subs(std::string(msg.substr(3))) == -1) {
-          ws_end(ws, 69);
-          return;
-        }
+      commands::command_outs_t out;
+      int status = commands::run(msg, out);
+
+      if (status < 0) {
+        ws_end(ws, 69);
+        return;
       }
 
-      else if (msg.find("gcv;") == 0) {
-        int s = 0;
-        auto n = std::string(msg.substr(4));
-
-        if (msg.length() < 5 || (s = gcv(n)) == -1) {
-          ws_end(ws, 69);
-          return;
-        }
-
-        if (s)
-          ws->send(p_state(n, s));
-      }
-
-      else if (msg.find("gp;") == 0) {
-        // calling get_state_page in gp should lock cbox mutex
-        atcboxes::cbox_lock_guard_t lk;
-
-        std::pair<uint64_t const *, size_t> s = {NULL, 0};
-        std::string page_number(msg.substr(3));
-
-        if (msg.length() < 4 || (s = gp(page_number)).first == NULL) {
-          ws_end(ws, 69);
-          return;
-        }
-
-        if (s.first) {
-          constexpr const size_t conversion = sizeof(uint64_t);
-          ws_send(ws, std::string("ws;") + page_number);
-          ws->send({(const char *)s.first, s.second * conversion});
-        }
-      }
-
-      else if (msg.find("gv;") == 0) {
-        if (msg.length() != 3) {
-          ws_end(ws, 69);
-          return;
-        }
-
-        ws_send(ws, p_gv());
-      }
-
-      else {
+      switch (status) {
+      case 0:
+        handle_ws_command_outs(ws, out);
+        break;
+      case 1: {
         int r = switch_state(std::stoull(std::string(msg)));
 
         if (r == -1) {
@@ -325,7 +252,7 @@ int run() {
           return;
         }
 
-        publish_global(ws, p_state(std::string(msg), r));
+        publish_global(ws, commands::p_state(std::string(msg), r));
 
         const long long cur = get_current_ts();
         if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 105 : 120)) {
@@ -353,7 +280,9 @@ int run() {
         }
 
         ud->last_ts = cur;
+        break;
       }
+      } // switch
     } catch (...) {
       ws_end(ws, 420);
       std::cerr << "[message ERROR]: `" << msg << "`\n";
