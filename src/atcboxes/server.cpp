@@ -199,6 +199,7 @@ int run() {
     ud->n_i = 0;
     ud->flags = WSDF_NONE;
     ud->last_ts = get_current_ts();
+    ud->cached.clear();
 
     ws->subscribe("global");
     increment_user_count(ws);
