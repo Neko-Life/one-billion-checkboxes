@@ -246,18 +246,18 @@ uint64_t get_gv() {
 int switch_state(uint64_t i) {
   auto cb = get_cb(i);
 
-  printf("BEFORE(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu)\n", i, cb.first, cb.second,
-         1ULL << cb.second, cboxes[cb.first]);
+  // printf("BEFORE(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu)\n", i, cb.first, cb.second,
+  //        1ULL << cb.second, cboxes[cb.first]);
 
   int ret = switch_c(cb.first, cb.second);
 
-  uint64_t c8 = i > 0 ? i / 8 : 0;
-  int b8 = i > 0 ? i % 8 : 0;
-  printf("SWITCHED %s(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu) c8(%zu) b8(%d) "
-         "b8n(%llu) c8v(%d) c64v(%zu)\n",
-         ret ? "ON" : "OFF", i, cb.first, cb.second, 1ULL << cb.second,
-         cboxes[cb.first], c8, b8, 1ULL << b8, ((uint8_t *)cboxes)[c8],
-         cboxes[c8]);
+  // uint64_t c8 = i > 0 ? i / 8 : 0;
+  // int b8 = i > 0 ? i % 8 : 0;
+  // printf("SWITCHED %s(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu) c8(%zu) b8(%d) "
+  //        "b8n(%llu) c8v(%d) c64v(%zu)\n",
+  //        ret ? "ON" : "OFF", i, cb.first, cb.second, 1ULL << cb.second,
+  //        cboxes[cb.first], c8, b8, 1ULL << b8, ((uint8_t *)cboxes)[c8],
+  //        cboxes[c8]);
   return ret;
 }
 

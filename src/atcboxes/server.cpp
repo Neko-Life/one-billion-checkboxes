@@ -99,8 +99,8 @@ static void inc(WS *ws, std::string_view data) {
     ud->cached = std::string(data);
   }
 
-  printf("n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o, ud->n_i,
-         ud->cached.c_str(), std::string(data).c_str());
+  // printf("n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o, ud->n_i,
+  //        ud->cached.c_str(), std::string(data).c_str());
 }
 
 static void ws_send(WS *ws, std::string_view msg) {
@@ -223,8 +223,8 @@ int run() {
 
     try {
       if (ud->flags & WSDF_C) {
-        printf("SHOULD BE: n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o,
-               ud->n_i, ud->cached.c_str(), std::string(msg).c_str());
+        // printf("SHOULD BE: n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o,
+        //        ud->n_i, ud->cached.c_str(), std::string(msg).c_str());
 
         if (!ud->cached.empty() && msg != ud->cached) {
           ws_end(ws, 69);
@@ -258,7 +258,7 @@ int run() {
         publish_global(ws, commands::p_state(std::string(msg), r));
 
         const long long cur = get_current_ts();
-        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 105 : 120)) {
+        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 90 : 155)) {
           srand(cur);
           int rs = get_rand() & 1;
           if (rs) {
