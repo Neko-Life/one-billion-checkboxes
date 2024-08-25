@@ -22,9 +22,9 @@ namespace atcboxes {
 constexpr size_t _s64 = sizeof(uint64_t);
 constexpr size_t _r = _s64 * CHAR_BIT;
 
-constexpr size_t cbsiz = A_TRILLION / _r;
-constexpr size_t max_idx = cbsiz - 1;
-constexpr size_t cbmem_s = _s64 * cbsiz;
+constexpr uint64_t cbsiz = A_TRILLION / _r;
+constexpr uint64_t max_idx = cbsiz - 1;
+constexpr uint64_t cbmem_s = _s64 * cbsiz;
 
 static void print_spec() {
   fprintf(stderr,
@@ -33,12 +33,12 @@ static void print_spec() {
           _s64, CHAR_BIT, _r, cbsiz, cbmem_s);
 }
 
-#ifdef ACTUALLY_A_TRILLION
+#ifdef USE_MALLOC
 static uint64_t *cboxes = NULL;
 #else
 // yes, 125MB on the data segment
 static uint64_t cboxes[cbsiz] = {0};
-#endif // ACTUALLY_A_TRILLION
+#endif // USE_MALLOC
 
 uint64_t gv = 0;
 
@@ -161,37 +161,41 @@ static int reset_state() {
  * @param bit zero based (0-63)
  * @return 0 off, 1 on, -1 err
  */
-static int switch_c(size_t c, short bit) {
+static int switch_c(uint64_t c, uint64_t bit) {
   if (c > max_idx)
     return -1;
 
-  uint64_t b = 1 << bit;
+  uint64_t b = 1;
+  b <<= bit;
 
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
 
-  cboxes[c] = (cboxes[c] & b) ? cboxes[c] & (~b) // remove if had it
-                              : cboxes[c] | b;   // else add
+  bool had = (cboxes[c] & b) != 0;
 
-  int ret = (cboxes[c] & b) ? 1 : 0;
+  cboxes[c] = had ? cboxes[c] & (~b) // remove if had it
+                  : cboxes[c] | b;   // else add
+
+  int ret = !had ? 1 : 0;
 
   ret ? gv++ : gv--;
 
   return ret;
 }
 
-static std::pair<size_t, short> get_cb(uint64_t i) {
-  size_t c = i > 0 ? i / 64 : 0;
-  short b = i > 0 ? i % 64 : 0;
+static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
+  uint64_t c = i > 0 ? i / 64 : 0;
+  uint64_t b = i > 0 ? i % 64 : 0;
 
   return {c, b};
 }
 
-static int get_cv(size_t c, short bit) {
+static int get_cv(uint64_t c, uint64_t bit) {
   if (c > max_idx)
     return -1;
 
-  uint64_t b = 1 << bit;
+  uint64_t b = 1;
+  b <<= bit;
 
   std::lock_guard lk(cb_m);
 
@@ -199,7 +203,7 @@ static int get_cv(size_t c, short bit) {
 }
 
 static void init_main() {
-#ifdef ACTUALLY_A_TRILLION
+#ifdef USE_MALLOC
   fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
   cboxes = (uint64_t *)malloc(cbmem_s);
 
@@ -208,22 +212,25 @@ static void init_main() {
     perror("[init_main FATAL]");
     exit(1);
   }
-#endif // ACTUALLY_A_TRILLION
+#endif // USE_MALLOC
 
   load_state(STATE_FILE);
 }
 
 static void free_main() {
-#ifdef ACTUALLY_A_TRILLION
+#ifdef USE_MALLOC
   if (!cboxes) {
     fprintf(stderr, "[free_main ERROR] State freed\n");
     return;
   }
 
+  save_state(STATE_FILE);
+
   free(cboxes);
   cboxes = NULL;
-#endif // ACTUALLY_A_TRILLION
+#else
   save_state(STATE_FILE);
+#endif // USE_MALLOC
 }
 
 uint64_t get_gv() {
@@ -239,8 +246,18 @@ uint64_t get_gv() {
 int switch_state(uint64_t i) {
   auto cb = get_cb(i);
 
+  printf("BEFORE(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu)\n", i, cb.first, cb.second,
+         1ULL << cb.second, cboxes[cb.first]);
+
   int ret = switch_c(cb.first, cb.second);
-  printf("SWITCHED %s(%zu)\n", ret ? "ON" : "OFF", i);
+
+  uint64_t c8 = i > 0 ? i / 8 : 0;
+  int b8 = i > 0 ? i % 8 : 0;
+  printf("SWITCHED %s(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu) c8(%zu) b8(%d) "
+         "b8n(%llu) c8v(%d) c64v(%zu)\n",
+         ret ? "ON" : "OFF", i, cb.first, cb.second, 1ULL << cb.second,
+         cboxes[cb.first], c8, b8, 1ULL << b8, ((uint8_t *)cboxes)[c8],
+         cboxes[c8]);
   return ret;
 }
 

@@ -96,7 +96,7 @@ int run(std::string_view cmd, command_outs_t &out) {
     if (s.first) {
       constexpr const size_t conversion = sizeof(uint64_t);
       out.push_back({std::string("ws;") + page_number, 0});
-      out.push_back({{(const char *)s.first, s.second * conversion}, 1});
+      out.push_back({{(char *)s.first, s.second * conversion}, 1});
       return 0;
     }
   }

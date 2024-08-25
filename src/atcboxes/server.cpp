@@ -223,6 +223,9 @@ int run() {
 
     try {
       if (ud->flags & WSDF_C) {
+        printf("SHOULD BE: n_o(%d) n_i(%d) cached(%s) data(%s)\n", ud->n_o,
+               ud->n_i, ud->cached.c_str(), std::string(msg).c_str());
+
         if (!ud->cached.empty() && msg != ud->cached) {
           ws_end(ws, 69);
           return;
@@ -267,7 +270,7 @@ int run() {
             ud->n_o = n > 0 ? n : ud->n_o;
           }
 
-          size_t x = get_rand_modulo(ud->n_o) * 2;
+          size_t x = get_rand_modulo(ud->n_o) * 2 + ud->n_o;
           for (size_t i = 0; i < x; i++) {
             char b[9];
             rand_chars(b, 9);

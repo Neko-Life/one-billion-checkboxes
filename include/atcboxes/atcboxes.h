@@ -12,11 +12,13 @@
 
 #define A_TRILLION 1'000'000'000'000
 #define A_TRILLION_STR "1'000'000'000'000"
+#define USE_MALLOC
 
 #else
 
 #define A_TRILLION 1'000'000'000
 #define A_TRILLION_STR "1'000'000'000"
+// #define USE_MALLOC
 
 #endif // ACTUALLY_A_TRILLION
 
