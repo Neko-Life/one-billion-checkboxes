@@ -304,10 +304,8 @@ int run() {
         if (s.first) {
           constexpr const size_t conversion = sizeof(uint64_t);
           ws_send(ws, std::string("ws;") + page_number);
-          ws->send(std::string("e;\n") +
-                   std::string((const char *)s.first, s.second * conversion));
+          ws->send({(const char *)s.first, s.second * conversion});
         }
-
       }
 
       else if (msg.find("gv;") == 0) {
@@ -330,19 +328,20 @@ int run() {
         publish_global(ws, p_state(std::string(msg), r));
 
         const long long cur = get_current_ts();
-        if ((cur - ud->last_ts) < 60) {
+        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 105 : 120)) {
           srand(cur);
-          int rs = get_rand_modulo(2);
+          int rs = get_rand() & 1;
           if (rs) {
             ws_send(ws, "l;");
             char b[3];
             rand_chars(b, 3);
             int n = get_rand_modulo(10);
-            ud->n_o = n > 0 ? n : ud->n_o;
             ws_send(ws, std::string(b) + std::to_string(n));
+            ud->n_o = n > 0 ? n : ud->n_o;
           }
 
-          while (ud->n_i != 0) {
+          size_t x = get_rand_modulo(ud->n_o) * 2;
+          for (size_t i = 0; i < x; i++) {
             char b[9];
             rand_chars(b, 9);
             ws_send(ws, std::string(b));

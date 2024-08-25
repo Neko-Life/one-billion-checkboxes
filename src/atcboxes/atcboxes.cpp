@@ -224,7 +224,9 @@ int get_cv(size_t c, short bit) {
 int switch_state(uint64_t i) {
   auto cb = get_cb(i);
 
-  return switch_c(cb.first, cb.second);
+  int ret = switch_c(cb.first, cb.second);
+  printf("SWITCHED %s(%zu)\n", ret ? "ON" : "OFF", i);
+  return ret;
 }
 
 /**
