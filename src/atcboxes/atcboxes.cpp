@@ -1,8 +1,9 @@
 #include "atcboxes/atcboxes.h"
+#include "atcboxes/migrate.h"
 #include "atcboxes/runtime_cli.h"
 #include "atcboxes/server.h"
+#include "atcboxes/test.h"
 #include <cassert>
-#include <chrono>
 #include <climits>
 #include <cstdint>
 #include <cstdio>
@@ -15,14 +16,19 @@
   for (int i = 1; i < argc; i++)                                               \
   x
 
-#define ARGCMP(x) strcmp(argv[i], x) == 0
+#define ARGCMP(x) (strcmp(argv[i], x) == 0)
+#define ARGVAL argv[i]
 
 namespace atcboxes {
 
-constexpr size_t _s64 = sizeof(uint64_t);
+constexpr size_t _s64 = sizeof(CBOX_T);
+#ifdef WITH_COLOR
+constexpr uint64_t cbsiz = A_TRILLION;
+constexpr size_t _r = 1;
+#else
 constexpr size_t _r = _s64 * CHAR_BIT;
-
 constexpr uint64_t cbsiz = A_TRILLION / _r;
+#endif
 constexpr uint64_t max_idx = cbsiz - 1;
 constexpr uint64_t cbmem_s = _s64 * cbsiz;
 
@@ -34,10 +40,10 @@ static void print_spec() {
 }
 
 #ifdef USE_MALLOC
-static uint64_t *cboxes = NULL;
+static CBOX_T *cboxes = NULL;
 #else
 // yes, 125MB on the data segment
-static uint64_t cboxes[cbsiz] = {0};
+static CBOX_T cboxes[cbsiz] = {{}};
 #endif // USE_MALLOC
 
 uint64_t gv = 0;
@@ -71,7 +77,7 @@ static int load_state(const char *filepath) {
 
   gv = 0;
   constexpr size_t bufsiz = 1024;
-  uint64_t temp[bufsiz] = {0};
+  CBOX_T temp[bufsiz] = {{}};
 
   size_t total_el = 0;
   ssize_t read = 0;
@@ -80,6 +86,10 @@ static int load_state(const char *filepath) {
     for (size_t i = 0; i < read && (i + total_el) < cbsiz; i++) {
       cboxes[i + total_el] = temp[i];
 
+#ifdef WITH_COLOR
+      if (temp[i].a & 1)
+        gv++;
+#else
       uint64_t l = 1;
       while (l) {
         if (temp[i] & l)
@@ -87,6 +97,7 @@ static int load_state(const char *filepath) {
 
         l <<= 1;
       }
+#endif // WITH_COLOR
 
       synched++;
     }
@@ -166,15 +177,22 @@ static int switch_c(uint64_t c, uint64_t bit) {
     return -1;
 
   uint64_t b = 1;
+#ifdef WITH_COLOR
+#define CMP cboxes[c].a
+#else
+#define CMP cboxes[c]
   b <<= bit;
 
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
+#endif // WITH_COLOR
 
-  bool had = (cboxes[c] & b) != 0;
+  bool had = (CMP & b) != 0;
 
-  cboxes[c] = had ? cboxes[c] & (~b) // remove if had it
-                  : cboxes[c] | b;   // else add
+  CMP = had ? CMP & (~b) // remove if had it
+            : CMP | b;   // else add
+
+#undef CMP
 
   int ret = !had ? 1 : 0;
 
@@ -184,22 +202,31 @@ static int switch_c(uint64_t c, uint64_t bit) {
 }
 
 static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
+#ifdef WITH_COLOR
+  return {i, 1};
+#else
   uint64_t c = i > 0 ? i / 64 : 0;
   uint64_t b = i > 0 ? i % 64 : 0;
 
   return {c, b};
+#endif
 }
 
 static int get_cv(uint64_t c, uint64_t bit) {
   if (c > max_idx)
     return -1;
 
+#ifdef WITH_COLOR
+  std::lock_guard lk(cb_m);
+  return (cboxes[c].a & 1);
+#else
   uint64_t b = 1;
   b <<= bit;
 
   std::lock_guard lk(cb_m);
 
   return (cboxes[c] & b) ? 1 : 0;
+#endif // WITH_COLOR
 }
 
 static void init_main() {
@@ -246,19 +273,26 @@ uint64_t get_gv() {
 int switch_state(uint64_t i) {
   auto cb = get_cb(i);
 
-  // printf("BEFORE(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu)\n", i, cb.first, cb.second,
-  //        1ULL << cb.second, cboxes[cb.first]);
+  return switch_c(cb.first, cb.second);
+}
 
-  int ret = switch_c(cb.first, cb.second);
+/**
+ * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ * @param s color state
+ * @return 0 off, 1 on, -1 err
+ */
+int switch_state(uint64_t i, const CBOX_T &s) {
+  if (i > max_idx)
+    return -1;
 
-  // uint64_t c8 = i > 0 ? i / 8 : 0;
-  // int b8 = i > 0 ? i % 8 : 0;
-  // printf("SWITCHED %s(%zu) c(%ld) b(%lu) bn(%llu) cv(%zu) c8(%zu) b8(%d) "
-  //        "b8n(%llu) c8v(%d) c64v(%zu)\n",
-  //        ret ? "ON" : "OFF", i, cb.first, cb.second, 1ULL << cb.second,
-  //        cboxes[cb.first], c8, b8, 1ULL << b8, ((uint8_t *)cboxes)[c8],
-  //        cboxes[c8]);
-  return ret;
+  std::lock_guard lk(cb_m);
+  std::lock_guard lj(gv_m);
+
+  uint8_t prev = cboxes[i].a & 1 ? 0xFF : 0xFE;
+  cboxes[i] = s;
+  cboxes[i].a &= prev;
+
+  return switch_c(i, 1);
 }
 
 /**
@@ -271,7 +305,7 @@ int get_state(uint64_t i) {
   return get_cv(cb.first, cb.second);
 }
 
-std::pair<uint64_t const *, size_t> get_state_page(uint64_t page) {
+std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page) {
   constexpr const size_t el_per_page = SIZE_PER_PAGE / _r;
   constexpr const size_t max_page = (A_TRILLION / SIZE_PER_PAGE) - 1;
 
@@ -281,27 +315,36 @@ std::pair<uint64_t const *, size_t> get_state_page(uint64_t page) {
   return {cboxes + (page * el_per_page), el_per_page};
 }
 
-int test();
+////////////////////
 
 int run(const int argc, const char *const argv[]) {
-  printf("Hello World!\n");
   print_spec();
 
+  // cli args
   bool testing = false;
+  bool migrating = false;
+  std::string migratefile = "";
+
   ARGV_LOOP({
     if (ARGCMP("test")) {
       testing = true;
+    } else if (ARGCMP("migrate")) {
+      migrating = true;
+    } else if (migrating) {
+      migratefile = ARGVAL;
     }
-    /*
-       if (ARGCMP("")) {
-       } */
   })
+
+  if (migrating)
+    return migrate::run(migratefile);
+
+  ////////////////////
 
   init_main();
 
   int status = 0;
   if (testing)
-    status = test();
+    status = test::run(cboxes);
   else {
     runtime_cli::run();
     status = server::run();
@@ -311,66 +354,6 @@ int run(const int argc, const char *const argv[]) {
   runtime_cli::shutdown();
 
   return status;
-}
-
-int test() {
-  size_t li = cbsiz - 1;
-  cboxes[li] = 28765284;
-  assert(cboxes[li] ==
-         0b0000000000000000000000000000000000000001101101101110110001100100);
-
-  printf("%zu\n", cboxes[li]);
-  save_state("state1");
-  reset_state();
-  printf("%zu\n", cboxes[li]);
-
-  load_state("state1");
-  printf("%zu\n", cboxes[li]);
-  assert(cboxes[li] ==
-         0b0000000000000000000000000000000000000001101101101110110001100100);
-  reset_state();
-
-  auto start =
-      std::chrono::high_resolution_clock::now().time_since_epoch().count();
-  switch_state(999999960);
-  switch_state(999999959);
-  switch_state(999999957);
-  switch_state(999999956);
-  switch_state(999999954);
-  switch_state(999999953);
-  switch_state(999999951);
-  switch_state(999999950);
-  switch_state(999999949);
-  switch_state(999999947);
-  switch_state(999999946);
-  printf("%zu\n", gv);
-  assert(gv == 11);
-  switch_state(999999942);
-  switch_state(999999941);
-  switch_state(999999938);
-  printf("%zu\n", gv);
-  assert(gv == 14);
-  assert(cboxes[li] ==
-         0b0000000000000000000000000000000000000001101101101110110001100100);
-  switch_state(999999938);
-  printf("%zu\n", gv);
-  assert(gv == 13);
-  assert(cboxes[li] ==
-         0b0000000000000000000000000000000000000001101101101110110001100000);
-  switch_state(999999938);
-  printf("%zu\n", gv);
-  assert(gv == 14);
-  auto end =
-      std::chrono::high_resolution_clock::now().time_since_epoch().count();
-  printf("took %lld picosecond\n", end - start);
-
-  assert(cboxes[li] ==
-         0b0000000000000000000000000000000000000001101101101110110001100100);
-
-  struct timespec t = {1, 0};
-  thrd_sleep(&t, NULL);
-
-  return 0;
 }
 
 } // namespace atcboxes

@@ -259,7 +259,7 @@ int run() {
         publish_global(ws, commands::p_state(std::string(msg), r));
 
         const long long cur = get_current_ts();
-        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 90 : 155)) {
+        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 90 : 165)) {
           srand(cur);
           int rs = get_rand() & 1;
           if (rs) {

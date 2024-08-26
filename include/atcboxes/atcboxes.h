@@ -4,14 +4,24 @@
 #include <cstdint>
 #include <mutex>
 
-#define SIZE_PER_PAGE 1'000'000
-
 #define STATE_FILE "state.atcb"
+
+#define WITH_COLOR
+
+#ifdef WITH_COLOR
+#define SIZE_PER_PAGE 250'000
+#define CBOX_T atcboxes::cbox_t
+#else
+#define SIZE_PER_PAGE 1'000'000
+#define CBOX_T uint64_t
+#endif // WITH_COLOR
 
 #ifdef ACTUALLY_A_TRILLION
 
 #define A_TRILLION 1'000'000'000'000
 #define A_TRILLION_STR "1'000'000'000'000"
+// this will always be too huge (125GB without color)
+// and color support requires 4000GB
 #define USE_MALLOC
 
 #else
@@ -20,16 +30,25 @@
 #define A_TRILLION_STR "1'000'000'000"
 // #define USE_MALLOC
 
+#ifdef WITH_COLOR
+// lets try if we can put 4GB in the data segment
+// uncomment later if segfault
+// #define USE_MALLOC
+#endif // WITH_COLOR
+
 #endif // ACTUALLY_A_TRILLION
 
 namespace atcboxes {
 
-// unused for now, i havent even start the frontend
+#ifdef WITH_COLOR
 struct cbox_t {
   uint8_t r;
   uint8_t g;
   uint8_t b;
+  // bit 0 is for active state
+  uint8_t a;
 };
+#endif // WITH_COLOR
 
 struct cbox_lock_guard_t {
   std::lock_guard<std::mutex> lk;
@@ -44,20 +63,30 @@ uint64_t get_gv();
  * @param i zero based global bit idx (0-(1'000'000'000'000-1))
  * @return 0 off, 1 on, -1 err
  */
-int switch_state(uint64_t i);
+int switch_state(uint64_t i
+#ifdef WITH_COLOR
+                 ,
+                 const CBOX_T &s
+#endif // WITH_COLOR
+);
 
 /**
  * @param i zero based global bit idx (0-(1'000'000'000'000-1))
  * @return 0 off, 1 on, -1 err
  */
-int get_state(uint64_t i);
+int get_state(uint64_t i
+#ifdef WITH_COLOR
+              ,
+              CBOX_T &s
+#endif // WITH_COLOR
+);
 
 /**
  * @brief Caller should lock cbox mutex by constructing cbox_lock_guard_t before
  *        calling this function and keeping it alive as long as the return value
  *        is gonna be used.
  */
-std::pair<uint64_t const *, size_t> get_state_page(uint64_t page);
+std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page);
 
 int run(const int argc, const char *const argv[]);
 
