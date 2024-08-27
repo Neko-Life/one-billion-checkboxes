@@ -249,7 +249,15 @@ int run() {
         handle_ws_command_outs(ws, out);
         break;
       case 1: {
+#ifdef WITH_COLOR
+                  cbox_t s;
+                  uint64_t i = A_TRILLION;
+                  parse_cbox_wc(msg, i, s);
+
+        int r = switch_state(i, s);
+#else
         int r = switch_state(std::stoull(std::string(msg)));
+#endif // WITH_COLOR
 
         if (r == -1) {
           ws_end(ws, 69);

@@ -61,6 +61,7 @@ uint64_t get_gv();
 
 /**
  * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ * @param s state out
  * @return 0 off, 1 on, -1 err
  */
 int switch_state(uint64_t i
@@ -72,6 +73,7 @@ int switch_state(uint64_t i
 
 /**
  * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ * @param s state out
  * @return 0 off, 1 on, -1 err
  */
 int get_state(uint64_t i

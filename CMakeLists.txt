@@ -8,6 +8,18 @@ project(atcboxes
 option(DEBUG_SYMBOL "Build ${PROJECT_NAME} with debug symbol" ON)
 option(ACTUALLY_A_TRILLION "Build ${PROJECT_NAME} with actually a TRILLION checkbox state (requiring 125GB of memory)" OFF)
 
+if (NOT ATCB_VERSION_MAJOR)
+	set(ATCB_VERSION_MAJOR 0)
+endif()
+if (NOT ATCB_VERSION_MINOR)
+	set(ATCB_VERSION_MINOR 0)
+endif()
+if (NOT ATCB_VERSION_PATCH)
+	set(ATCB_VERSION_PATCH 0)
+endif()
+
+message("-- INFO: Configuring ${PROJECT_NAME} version ${ATCB_VERSION_MAJOR}.${ATCB_VERSION_MINOR}.${ATCB_VERSION_PATCH}")
+
 set(PROJ_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
 
@@ -25,6 +37,10 @@ add_executable(${PROJECT_NAME}
 
 	${PROJ_SOURCE_FILES}
 	src/main.cpp)
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_MAJOR="${ATCB_VERSION_MAJOR}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_MINOR="${ATCB_VERSION_MINOR}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_PATCH="${ATCB_VERSION_PATCH}")
 
 set(USOCKETS_OBJECT_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/libs/uWebSockets/uSockets/bsd.o

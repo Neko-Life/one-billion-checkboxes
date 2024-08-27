@@ -33,6 +33,9 @@ constexpr uint64_t cbsiz = A_TRILLION / _r;
 constexpr uint64_t max_idx = cbsiz - 1;
 constexpr uint64_t cbmem_s = _s64 * cbsiz;
 
+const char *statefile = STATE_FILE;
+const char *runbin = "./atcboxes";
+
 static void print_spec() {
   fprintf(stderr,
           "uint64_t_size(%zu) char_bit(%d) " A_TRILLION_STR
@@ -95,7 +98,7 @@ static int load_state(const char *filepath) {
 
     if (synched != read) {
       fprintf(stderr, "[load_state ERROR] Corrupted state file (synched != "
-                      "read), exiting\n");
+                      "read), probably code error.\nExiting...\n");
 
       exit(2);
     }
@@ -107,8 +110,12 @@ static int load_state(const char *filepath) {
           filepath);
 
   if (total_el != cbsiz) {
-    fprintf(stderr, "[load_state ERROR] Corrupted state file (total_el != "
-                    "cbsiz), exiting\n");
+    fprintf(stderr, "[load_state FATAL] Corrupted state file (total_el != "
+                    "cbsiz)\n");
+    fprintf(stderr, "If this state file ever valid before, try running the "
+                    "migrate command:\n");
+    fprintf(stderr, "\t%s migrate '%s'\n\n", runbin, filepath);
+    fprintf(stderr, "Exiting...\n");
 
     exit(3);
   }
@@ -194,6 +201,8 @@ static int switch_c(uint64_t c, uint64_t bit) {
 
 static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
 #ifdef WITH_COLOR
+  // is this function even used??
+  // lets keep it here for comedy, muhaha
   return {i, 1};
 #else
   uint64_t c = i > 0 ? i / 64 : 0;
@@ -203,51 +212,34 @@ static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
 #endif
 }
 
-static int get_cv(uint64_t c, uint64_t bit) {
-  if (c > max_idx)
-    return -1;
-
-#ifdef WITH_COLOR
-  std::lock_guard lk(cb_m);
-  return (cboxes[c].a & 1);
-#else
-  uint64_t b = 1;
-  b <<= bit;
-
-  std::lock_guard lk(cb_m);
-
-  return (cboxes[c] & b) ? 1 : 0;
-#endif // WITH_COLOR
-}
-
 static void init_main() {
 #ifdef USE_MALLOC
   fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
-  cboxes = (uint64_t *)malloc(cbmem_s);
+  cboxes = (CBOX_T *)malloc(cbmem_s);
 
-  if (!cboxes) {
+  if (cboxes == NULL) {
     // dont have enough ram? die
     perror("[init_main FATAL]");
     exit(1);
   }
 #endif // USE_MALLOC
 
-  load_state(STATE_FILE);
+  load_state(statefile);
 }
 
 static void free_main() {
 #ifdef USE_MALLOC
-  if (!cboxes) {
+  if (cboxes == NULL) {
     fprintf(stderr, "[free_main ERROR] State freed\n");
     return;
   }
 
-  save_state(STATE_FILE);
+  save_state(statefile);
 
   free(cboxes);
   cboxes = NULL;
 #else
-  save_state(STATE_FILE);
+  save_state(statefile);
 #endif // USE_MALLOC
 }
 
@@ -257,14 +249,15 @@ uint64_t get_gv() {
   return gv;
 }
 
-/**
- * @param i zero based global bit idx (0-(1'000'000'000'000-1))
- * @return 0 off, 1 on, -1 err
- */
-int switch_state(uint64_t i) {
-  auto cb = get_cb(i);
+#ifdef WITH_COLOR
+static int get_cv(uint64_t c, cbox_t &s) {
+  if (c > max_idx)
+    return -1;
 
-  return switch_c(cb.first, cb.second);
+  std::lock_guard lk(cb_m);
+  s = cboxes[c];
+
+  return (cboxes[c].a & 1) ? 1 : 0;
 }
 
 /**
@@ -288,6 +281,41 @@ int switch_state(uint64_t i, const CBOX_T &s) {
 
 /**
  * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ * @param s color
+ * @return 0 off, 1 on, -1 err
+ */
+int get_state(uint64_t i, cbox_t &s) {
+  std::lock_guard lk(cb_m);
+
+  return get_cv(i, s);
+}
+
+#else
+
+static int get_cv(uint64_t c, uint64_t bit) {
+  if (c > max_idx)
+    return -1;
+
+  uint64_t b = 1;
+  b <<= bit;
+
+  std::lock_guard lk(cb_m);
+
+  return (cboxes[c] & b) ? 1 : 0;
+}
+
+/**
+ * @param i zero based global bit idx (0-(1'000'000'000'000-1))
+ * @return 0 off, 1 on, -1 err
+ */
+int switch_state(uint64_t i) {
+  auto cb = get_cb(i);
+
+  return switch_c(cb.first, cb.second);
+}
+
+/**
+ * @param i zero based global bit idx (0-(1'000'000'000'000-1))
  * @return 0 off, 1 on, -1 err
  */
 int get_state(uint64_t i) {
@@ -295,6 +323,7 @@ int get_state(uint64_t i) {
 
   return get_cv(cb.first, cb.second);
 }
+#endif // WITH_COLOR
 
 std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page) {
   constexpr const size_t el_per_page = SIZE_PER_PAGE / _r;
@@ -308,25 +337,49 @@ std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page) {
 
 ////////////////////
 
+static void print_help() {
+  fprintf(stderr, "%s Checkboxes - Server\n", A_TRILLION_STR);
+#if defined(ATCB_VERSION_MAJOR) && defined(ATCB_VERSION_MINOR) &&              \
+    defined(ATCB_VERSION_PATCH)
+  fprintf(stderr, "version %d.%d.%d\n", ATCB_VERSION_MAJOR, ATCB_VERSION_MINOR,
+          ATCB_VERSION_PATCH);
+#endif // ATCB_VERSION_
+
+  fprintf(stderr, "Usage: %s [COMMAND] [OPTION...]\n\n", runbin);
+  fprintf(stderr, "Commands:\n");
+  fprintf(stderr, "Commands:\n");
+}
+
 int run(const int argc, const char *const argv[]) {
+  runbin = argv[0];
   print_spec();
 
   // cli args
   bool testing = false;
   bool migrating = false;
+  bool getstatefile = false;
   std::string migratefile = "";
 
   ARGV_LOOP({
-    if (ARGCMP("test")) {
+    if (ARGCMP("--help") || ARGCMP("-h")) {
+      print_help();
+      return 0;
+    } else if (ARGCMP("test")) {
       testing = true;
     } else if (ARGCMP("migrate")) {
       migrating = true;
+    } else if (ARGCMP("--state") || ARGCMP("-s")) {
+      getstatefile = true;
     } else if (migrating) {
       migratefile = ARGVAL;
+      migrating = false;
+    } else if (getstatefile) {
+      statefile = ARGVAL;
+      getstatefile = false;
     }
   })
 
-  if (migrating)
+  if (migrating || !migratefile.empty())
     return migrate::run(migratefile);
 
   ////////////////////
