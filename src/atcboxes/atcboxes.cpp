@@ -3,6 +3,7 @@
 #include "atcboxes/runtime_cli.h"
 #include "atcboxes/server.h"
 #include "atcboxes/test.h"
+#include "atcboxes/util.h"
 #include <cassert>
 #include <climits>
 #include <cstdint>
@@ -53,23 +54,13 @@ std::mutex gv_m;
 
 cbox_lock_guard_t::cbox_lock_guard_t() : lk(cb_m) {}
 
-static FILE *try_open(const char *filepath, const char *mode) {
-  FILE *f = fopen(filepath, mode);
-  if (!f) {
-    perror("[try_open ERROR]");
-    return NULL;
-  }
-
-  return f;
-}
-
 static int load_state(const char *filepath) {
   fprintf(stderr, "[load_state] Loading `%s`\n", filepath);
 
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
 
-  FILE *f = try_open(filepath, "rb");
+  FILE *f = util::try_open(filepath, "rb");
   int status = 0;
 
   if (!f)
@@ -133,7 +124,7 @@ static int load_state(const char *filepath) {
 static int save_state(const char *filepath) {
   std::lock_guard lk(cb_m);
 
-  FILE *f = try_open(filepath, "wb");
+  FILE *f = util::try_open(filepath, "wb");
   int status = 0;
 
   if (!f)
