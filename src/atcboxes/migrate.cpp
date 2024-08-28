@@ -23,11 +23,18 @@ int run(const std::string &file) {
 
   int status = -1;
 
-  struct stat s;
-  if (fstat(fileno(f), &s) != 0) {
-    perror("[migrate::run ERROR] fstat");
-    goto ferr;
+  {
+    struct stat s;
+    if (fstat(fileno(f), &s) != 0) {
+      perror("[migrate::run ERROR] fstat");
+      goto ferr;
+    }
+
+    fprintf(stderr, "%s: size(%ld)\n", file.c_str(), s.st_size);
   }
+
+  fclose(f);
+  f = NULL;
 
   return 0;
 

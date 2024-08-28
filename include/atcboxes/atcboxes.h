@@ -31,9 +31,8 @@
 // #define USE_MALLOC
 
 #ifdef WITH_COLOR
-// lets try if we can put 4GB in the data segment
-// uncomment later if segfault
-// #define USE_MALLOC
+// we cant put 4GB in the data segment!
+#define USE_MALLOC
 #endif // WITH_COLOR
 
 #endif // ACTUALLY_A_TRILLION

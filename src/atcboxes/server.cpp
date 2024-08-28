@@ -1,6 +1,7 @@
 #include "atcboxes/server.h"
 #include "atcboxes/atcboxes.h"
 #include "atcboxes/commands.h"
+#include "atcboxes/util.h"
 #include "uWebSockets/src/App.h"
 #include <csignal>
 #include <cstdint>
@@ -183,6 +184,38 @@ static void handle_ws_command_outs(WS *ws, commands::command_outs_t &out) {
   }
 }
 
+// some kind of a beautiful naming convention
+static void alsfyuwlefasliuyrfgarhbwsgawlrg_a(WS *ws) {
+  auto *ud = ws->getUserData();
+
+  const long long cur = get_current_ts();
+  if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 90 : 165)) {
+    srand(cur);
+    int rs = get_rand() & 1;
+    if (rs) {
+      ws_send(ws, "l;");
+      char b[3];
+      rand_chars(b, 3);
+      int n = get_rand_modulo(10);
+      ws_send(ws, std::string(b) + std::to_string(n));
+      ud->n_o = n > 0 ? n : ud->n_o;
+    }
+
+    size_t x = get_rand_modulo(ud->n_o) * 2 + ud->n_o;
+    for (size_t i = 0; i < x; i++) {
+      char b[9];
+      rand_chars(b, 9);
+      ws_send(ws, std::string(b));
+    }
+
+    ws_send(ws, "h;");
+
+    ud->flags |= WSDF_C;
+  }
+
+  ud->last_ts = cur;
+}
+
 int run() {
   signal(SIGINT, on_sigint);
 
@@ -250,11 +283,12 @@ int run() {
         break;
       case 1: {
 #ifdef WITH_COLOR
-                  cbox_t s;
-                  uint64_t i = A_TRILLION;
-                  parse_cbox_wc(msg, i, s);
+        cbox_t s;
+        uint64_t i = A_TRILLION;
+        int r = util::parse_cbox_wc(std::string(msg), i, s);
 
-        int r = switch_state(i, s);
+        if (r == 0)
+          r = switch_state(i, s);
 #else
         int r = switch_state(std::stoull(std::string(msg)));
 #endif // WITH_COLOR
@@ -266,32 +300,7 @@ int run() {
 
         publish_global(ws, commands::p_state(std::string(msg), r));
 
-        const long long cur = get_current_ts();
-        if ((cur - ud->last_ts) < (((cur & 1) == 0) ? 90 : 165)) {
-          srand(cur);
-          int rs = get_rand() & 1;
-          if (rs) {
-            ws_send(ws, "l;");
-            char b[3];
-            rand_chars(b, 3);
-            int n = get_rand_modulo(10);
-            ws_send(ws, std::string(b) + std::to_string(n));
-            ud->n_o = n > 0 ? n : ud->n_o;
-          }
-
-          size_t x = get_rand_modulo(ud->n_o) * 2 + ud->n_o;
-          for (size_t i = 0; i < x; i++) {
-            char b[9];
-            rand_chars(b, 9);
-            ws_send(ws, std::string(b));
-          }
-
-          ws_send(ws, "h;");
-
-          ud->flags |= WSDF_C;
-        }
-
-        ud->last_ts = cur;
+        alsfyuwlefasliuyrfgarhbwsgawlrg_a(ws);
         break;
       }
       } // switch

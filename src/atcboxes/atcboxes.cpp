@@ -37,9 +37,18 @@ const char *statefile = STATE_FILE;
 const char *runbin = "./atcboxes";
 
 static void print_spec() {
+  fprintf(stderr, "%s Checkboxes - Server\n", A_TRILLION_STR);
+#if defined(ATCB_VERSION_MAJOR) && defined(ATCB_VERSION_MINOR) &&              \
+    defined(ATCB_VERSION_PATCH)
+  fprintf(stderr, "Version %d.%d.%d\n", ATCB_VERSION_MAJOR, ATCB_VERSION_MINOR,
+          ATCB_VERSION_PATCH);
+#else
+  fprintf(stderr, "Version undefined\n");
+#endif // ATCB_VERSION_
+
   fprintf(stderr,
-          "uint64_t_size(%zu) char_bit(%d) " A_TRILLION_STR
-          "/%lu = cbsiz(%lu), cbmem_s(%zu)\n",
+          "spec: cbox_t_size(%zu) char_bit(%d) " A_TRILLION_STR
+          "/%lu = cbsiz(%lu), cbmem_s(%zu)\n\n",
           _s64, CHAR_BIT, _r, cbsiz, cbmem_s);
 }
 
@@ -153,6 +162,7 @@ static int save_state(const char *filepath) {
   return status;
 }
 
+// !TODO: make a command for this or smt
 static int reset_state() {
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
@@ -170,7 +180,7 @@ static int reset_state() {
  * @param bit zero based (0-63)
  * @return 0 off, 1 on, -1 err
  */
-static int switch_c(uint64_t c, uint64_t bit) {
+static int switch_c(uint64_t c, [[maybe_unused]] uint64_t bit) {
   if (c > max_idx)
     return -1;
 
@@ -199,7 +209,7 @@ static int switch_c(uint64_t c, uint64_t bit) {
   return ret;
 }
 
-static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
+[[maybe_unused]] static std::pair<uint64_t, uint64_t> get_cb(uint64_t i) {
 #ifdef WITH_COLOR
   // is this function even used??
   // lets keep it here for comedy, muhaha
@@ -274,8 +284,10 @@ int switch_state(uint64_t i, const CBOX_T &s) {
 
   uint8_t prev = cboxes[i].a & 1 ? 0xFF : 0xFE;
   cboxes[i] = s;
+  // keep previous active state
   cboxes[i].a &= prev;
 
+  // actually do the toggle
   return switch_c(i, 1);
 }
 
@@ -338,13 +350,6 @@ std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page) {
 ////////////////////
 
 static void print_help() {
-  fprintf(stderr, "%s Checkboxes - Server\n", A_TRILLION_STR);
-#if defined(ATCB_VERSION_MAJOR) && defined(ATCB_VERSION_MINOR) &&              \
-    defined(ATCB_VERSION_PATCH)
-  fprintf(stderr, "version %d.%d.%d\n", ATCB_VERSION_MAJOR, ATCB_VERSION_MINOR,
-          ATCB_VERSION_PATCH);
-#endif // ATCB_VERSION_
-
   fprintf(stderr, "Usage: %s [COMMAND] [OPTION...]\n\n", runbin);
   fprintf(stderr, "Commands:\n");
   fprintf(stderr, "Commands:\n");
@@ -352,6 +357,7 @@ static void print_help() {
 
 int run(const int argc, const char *const argv[]) {
   runbin = argv[0];
+
   print_spec();
 
   // cli args

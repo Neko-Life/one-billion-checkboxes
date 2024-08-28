@@ -38,9 +38,9 @@ add_executable(${PROJECT_NAME}
 	${PROJ_SOURCE_FILES}
 	src/main.cpp)
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_MAJOR="${ATCB_VERSION_MAJOR}")
-target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_MINOR="${ATCB_VERSION_MINOR}")
-target_compile_definitions(${PROJECT_NAME} PUBLIC ATCB_VERSION_PATCH="${ATCB_VERSION_PATCH}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC "ATCB_VERSION_MAJOR=${ATCB_VERSION_MAJOR}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC "ATCB_VERSION_MINOR=${ATCB_VERSION_MINOR}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC "ATCB_VERSION_PATCH=${ATCB_VERSION_PATCH}")
 
 set(USOCKETS_OBJECT_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/libs/uWebSockets/uSockets/bsd.o

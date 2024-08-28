@@ -84,7 +84,13 @@ static void run_thread() {
         if (g < 0)
           goto cmd_cont;
 
+#ifdef WITH_COLOR
+        cbox_t s;
+        int a = get_state(g, s);
+        fprintf(stderr, "%d, %d %d %d %d\n", a, s.r, s.g, s.b, s.a);
+#else
         fprintf(stderr, "%d\n", get_state(g));
+#endif // WITH_COLOR
       } break;
       }
 
