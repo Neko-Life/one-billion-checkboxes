@@ -6,8 +6,6 @@
 
 #define STATE_FILE "state.atcb"
 
-#define WITH_COLOR
-
 #ifdef WITH_COLOR
 #define SIZE_PER_PAGE 250'000
 #define CBOX_T atcboxes::cbox_t
@@ -24,22 +22,29 @@
 // and color support requires 4000GB
 #define USE_MALLOC
 
+#ifdef WITH_COLOR
+#define BUILD_TRILLION_WITH_COLOR
+#else
+#define BUILD_TRILLION_NO_COLOR
+#endif // WITH_COLOR
+
 #else
 
 #define A_TRILLION 1'000'000'000
 #define A_TRILLION_STR "1'000'000'000"
-// #define USE_MALLOC
 
 #ifdef WITH_COLOR
 // we cant put 4GB in the data segment!
 #define USE_MALLOC
+#define BUILD_BILLION_WITH_COLOR
+#else
+#define BUILD_BILLION_NO_COLOR
 #endif // WITH_COLOR
 
 #endif // ACTUALLY_A_TRILLION
 
 namespace atcboxes {
 
-#ifdef WITH_COLOR
 struct cbox_t {
   uint8_t r;
   uint8_t g;
@@ -47,7 +52,6 @@ struct cbox_t {
   // bit 0 is for active state
   uint8_t a;
 };
-#endif // WITH_COLOR
 
 struct cbox_lock_guard_t {
   std::lock_guard<std::mutex> lk;

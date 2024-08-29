@@ -6,6 +6,7 @@ project(atcboxes
 	DESCRIPTION "A Trillion Checkboxes - Web App")
 
 option(DEBUG_SYMBOL "Build ${PROJECT_NAME} with debug symbol" ON)
+option(WITH_COLOR "Build ${PROJECT_NAME} with color support" ON)
 option(ACTUALLY_A_TRILLION "Build ${PROJECT_NAME} with actually a TRILLION checkbox state (requiring 125GB of memory)" OFF)
 
 if (NOT ATCB_VERSION_MAJOR)
@@ -79,8 +80,13 @@ if (DEBUG_SYMBOL)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
+if (WITH_COLOR)
+	message("-- INFO: Will build ${PROJECT_NAME} with color support")
+	target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_COLOR)
+endif()
+
 if (ACTUALLY_A_TRILLION)
-	message("-- INFO: Will build ${PROJECT_NAME} with a TRILLION checkbox state, this will require 125GB of memory")
+	message("-- INFO: Will build ${PROJECT_NAME} with a TRILLION checkbox state")
 	target_compile_definitions(${PROJECT_NAME} PUBLIC ACTUALLY_A_TRILLION)
 else()
 	message("-- INFO: Will build ${PROJECT_NAME} with a BILLION checkbox state")
