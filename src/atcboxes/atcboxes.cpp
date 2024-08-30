@@ -365,8 +365,31 @@ void free_state() {
 
 static void print_help() {
   fprintf(stderr, "Usage: %s [COMMAND] [OPTION...]\n\n", runbin);
+
+  constexpr const char roptfmt[] = "\t%2s, %-8s %-24s %s\n";
+  constexpr const char cfmt[] = "\t%-12s %-24s %s\n";
+
+  fprintf(stderr, "Run options:\n");
+  fprintf(stderr, roptfmt, "-h", "--help", "", "Print this message and exit.");
+  fprintf(stderr, roptfmt, "-s", "--state", "</path/to/state.atcb>",
+          "Use this state file.");
+  fprintf(stderr, "\n");
+
   fprintf(stderr, "Commands:\n");
-  fprintf(stderr, "Commands:\n");
+  fprintf(stderr, cfmt, "migrate", "</path/to/state.atcb>",
+          "Migrate a state file to be compatible with this program's build.");
+  fprintf(stderr, cfmt, "", "",
+          "This will create a new state file with the original state file "
+          "untouched.");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "\n");
+  fprintf(
+      stderr,
+      "This is a footer. This footer does not have any useful information.\n");
+  fprintf(stderr, "It is a dummy footer to make this program somewhat more "
+                  "legitimate\neven though it won't, and just to make this "
+                  "message look good.\n\n"
+                  "But you read it anyway. So, thank you for reading\nand thank you for using this program.");
 }
 
 int run(const int argc, const char *const argv[]) {

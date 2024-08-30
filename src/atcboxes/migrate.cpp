@@ -177,7 +177,7 @@ int run(const std::string &file) {
   case 0: {
     static uint64_t TEMP_IN[4096] = {0};
 
-    const std::string writepath = file + ".migration";
+    const std::string writepath = file + ".migrated-bc";
 
     int status = -1;
     size_t readsiz = 0;
