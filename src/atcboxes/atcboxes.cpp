@@ -22,17 +22,6 @@
 
 namespace atcboxes {
 
-constexpr size_t _s64 = sizeof(CBOX_T);
-#ifdef WITH_COLOR
-constexpr uint64_t cbsiz = A_TRILLION;
-constexpr size_t _r = 1;
-#else
-constexpr size_t _r = _s64 * CHAR_BIT;
-constexpr uint64_t cbsiz = A_TRILLION / _r;
-#endif
-constexpr uint64_t max_idx = cbsiz - 1;
-constexpr uint64_t cbmem_s = _s64 * cbsiz;
-
 const char *statefile = STATE_FILE;
 const char *runbin = "./atcboxes";
 
@@ -47,16 +36,17 @@ static void print_spec() {
 #endif // ATCB_VERSION_
 
   fprintf(stderr,
-          "spec: cbox_t_size(%zu) char_bit(%d) " A_TRILLION_STR
-          "/%lu = cbsiz(%lu), cbmem_s(%zu)\n\n",
-          _s64, CHAR_BIT, _r, cbsiz, cbmem_s);
+          "Spec: STATE_ELEMENT_SIZE(%zu) CHAR_BIT(%d) " A_TRILLION_STR
+          "/%lu = STATE_ELEMENT_COUNT(%lu), STATE_SIZE_BYTES(%zu)\n\n",
+          STATE_ELEMENT_SIZE, CHAR_BIT, STATE_PER_ELEMENT, STATE_ELEMENT_COUNT,
+          STATE_SIZE_BYTES);
 }
 
 #ifdef USE_MALLOC
 static CBOX_T *cboxes = NULL;
 #else
 // yes, 125MB on the data segment
-static CBOX_T cboxes[cbsiz] = {{}};
+static CBOX_T cboxes[STATE_ELEMENT_COUNT] = {{}};
 #endif // USE_MALLOC
 
 uint64_t gv = 0;
@@ -84,9 +74,9 @@ static int load_state(const char *filepath) {
 
   size_t total_el = 0;
   ssize_t read = 0;
-  while ((read = fread(temp, _s64, bufsiz, f)) > 0) {
+  while ((read = fread(temp, STATE_ELEMENT_SIZE, bufsiz, f)) > 0) {
     size_t synched = 0;
-    for (size_t i = 0; i < read && (i + total_el) < cbsiz; i++) {
+    for (size_t i = 0; i < read && (i + total_el) < STATE_ELEMENT_COUNT; i++) {
       cboxes[i + total_el] = temp[i];
 
 #ifdef WITH_COLOR
@@ -118,9 +108,9 @@ static int load_state(const char *filepath) {
   fprintf(stderr, "[load_state] Read %zu elements from `%s`\n", total_el,
           filepath);
 
-  if (total_el != cbsiz) {
+  if (total_el != STATE_ELEMENT_COUNT) {
     fprintf(stderr, "[load_state FATAL] Corrupted state file (total_el != "
-                    "cbsiz)\n");
+                    "STATE_ELEMENT_COUNT)\n");
     fprintf(stderr, "If this state file ever valid before, try running the "
                     "migrate command:\n");
     fprintf(stderr, "\t%s migrate '%s'\n\n", runbin, filepath);
@@ -146,10 +136,10 @@ static int save_state(const char *filepath) {
   if (!f)
     return -1;
 
-  ssize_t wrote = fwrite(cboxes, _s64, cbsiz, f);
+  ssize_t wrote = fwrite(cboxes, STATE_ELEMENT_SIZE, STATE_ELEMENT_COUNT, f);
   fprintf(stderr, "[save_state] Wrote %zu elements to `%s`\n", wrote, filepath);
 
-  if (wrote != cbsiz) {
+  if (wrote != STATE_ELEMENT_COUNT) {
     fprintf(stderr, "[save_state ERROR] Failed saving state to `%s`\n",
             filepath);
 
@@ -167,7 +157,7 @@ static int reset_state() {
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
 
-  memset(cboxes, 0, cbmem_s);
+  memset(cboxes, 0, STATE_SIZE_BYTES);
   gv = 0;
 
   fprintf(stderr, "[reset_state] State resetted\n");
@@ -181,7 +171,7 @@ static int reset_state() {
  * @return 0 off, 1 on, -1 err
  */
 static int switch_c(uint64_t c, [[maybe_unused]] uint64_t bit) {
-  if (c > max_idx)
+  if (c > STATE_MAX_INDEX)
     return -1;
 
   uint64_t b = 1;
@@ -223,16 +213,7 @@ static int switch_c(uint64_t c, [[maybe_unused]] uint64_t bit) {
 }
 
 static void init_main() {
-#ifdef USE_MALLOC
-  fprintf(stderr, "[init_main] Allocating %zu bytes...\n", cbmem_s);
-  cboxes = (CBOX_T *)malloc(cbmem_s);
-
-  if (cboxes == NULL) {
-    // dont have enough ram? die
-    perror("[init_main FATAL]");
-    exit(1);
-  }
-#endif // USE_MALLOC
+  init_state();
 
   load_state(statefile);
 }
@@ -261,7 +242,7 @@ uint64_t get_gv() {
 
 #ifdef WITH_COLOR
 static int get_cv(uint64_t c, cbox_t &s) {
-  if (c > max_idx)
+  if (c > STATE_MAX_INDEX)
     return -1;
 
   std::lock_guard lk(cb_m);
@@ -276,7 +257,7 @@ static int get_cv(uint64_t c, cbox_t &s) {
  * @return 0 off, 1 on, -1 err
  */
 int switch_state(uint64_t i, const CBOX_T &s) {
-  if (i > max_idx)
+  if (i > STATE_MAX_INDEX)
     return -1;
 
   std::lock_guard lk(cb_m);
@@ -305,7 +286,7 @@ int get_state(uint64_t i, cbox_t &s) {
 #else
 
 static int get_cv(uint64_t c, uint64_t bit) {
-  if (c > max_idx)
+  if (c > STATE_MAX_INDEX)
     return -1;
 
   uint64_t b = 1;
@@ -338,13 +319,41 @@ int get_state(uint64_t i) {
 #endif // WITH_COLOR
 
 std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page) {
-  constexpr const size_t el_per_page = SIZE_PER_PAGE / _r;
+  constexpr const size_t el_per_page = SIZE_PER_PAGE / STATE_PER_ELEMENT;
   constexpr const size_t max_page = (A_TRILLION / SIZE_PER_PAGE) - 1;
 
   if (page > max_page)
     return {NULL, 0};
 
   return {cboxes + (page * el_per_page), el_per_page};
+}
+
+void init_state() {
+#ifdef USE_MALLOC
+  fprintf(stderr, "[init_state] Allocating %zu bytes...\n", STATE_SIZE_BYTES);
+  cboxes = (CBOX_T *)malloc(STATE_SIZE_BYTES);
+
+  if (cboxes == NULL) {
+    // dont have enough ram? die
+    perror("[init_main FATAL]");
+    exit(1);
+  }
+
+  // make sure its all zero
+  reset_state();
+#endif // USE_MALLOC
+}
+
+void free_state() {
+#ifdef USE_MALLOC
+  if (cboxes == NULL) {
+    fprintf(stderr, "[free_state ERROR] State freed\n");
+    return;
+  }
+
+  free(cboxes);
+  cboxes = NULL;
+#endif
 }
 
 ////////////////////

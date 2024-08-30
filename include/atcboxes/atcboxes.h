@@ -53,6 +53,17 @@ struct cbox_t {
   uint8_t a;
 };
 
+constexpr size_t STATE_ELEMENT_SIZE = sizeof(CBOX_T);
+#ifdef WITH_COLOR
+constexpr uint64_t STATE_ELEMENT_COUNT = A_TRILLION;
+constexpr size_t STATE_PER_ELEMENT = 1;
+#else
+constexpr size_t STATE_PER_ELEMENT = STATE_ELEMENT_SIZE * CHAR_BIT;
+constexpr uint64_t STATE_ELEMENT_COUNT = A_TRILLION / STATE_PER_ELEMENT;
+#endif
+constexpr uint64_t STATE_MAX_INDEX = STATE_ELEMENT_COUNT - 1;
+constexpr uint64_t STATE_SIZE_BYTES = STATE_ELEMENT_SIZE * STATE_ELEMENT_COUNT;
+
 struct cbox_lock_guard_t {
   std::lock_guard<std::mutex> lk;
 
@@ -92,6 +103,9 @@ int get_state(uint64_t i
  *        is gonna be used.
  */
 std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page);
+
+void init_state();
+void free_state();
 
 int run(const int argc, const char *const argv[]);
 

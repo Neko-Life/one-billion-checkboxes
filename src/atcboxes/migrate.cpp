@@ -13,6 +13,9 @@ static void no_migration_needed() {
 static void print_state_file_type(const char *file, int type) {
   const char *t = "unknown";
   switch (type) {
+  case -1:
+    t = "CORRUPT";
+    break;
   case 0:
     t = "BILLION_NO_COLOR";
     break;
@@ -25,6 +28,8 @@ static void print_state_file_type(const char *file, int type) {
   case 3:
     t = "TRILLION_WITH_COLOR";
     break;
+  default:
+    t = "UNKNOWN";
   }
 
   fprintf(stderr, "State file: %s\n", file);
@@ -65,24 +70,27 @@ int run(const std::string &file) {
   // 4. trillion with color
   // 5. broken state, should reset everything
 
-  FILE *f = util::try_open(file.c_str(), "rb");
-  if (f == NULL)
-    return -1;
-
   int status = -1;
   // state file type
   int state_file_t = -1;
 
   size_t fsiz = 0;
   {
+    FILE *f = util::try_open(file.c_str(), "rb");
+    if (f == NULL)
+      return -1;
+
     struct stat s;
     if (fstat(fileno(f), &s) != 0) {
-      perror("[migrate::run ERROR] fstat");
+      perror("fstat");
+      fclose(f);
       goto ferr;
     }
 
     fsiz = s.st_size;
-    fprintf(stderr, "%s: File size: %ld byte(s)\n", file.c_str(), fsiz);
+
+    fclose(f);
+    f = NULL;
   }
 
   switch (fsiz) {
@@ -117,30 +125,68 @@ int run(const std::string &file) {
     goto end;
 #endif
     state_file_t = 3;
-    // fprintf(
-    //     stderr,
-    //     "Recognized state file but migration isn't implemented,
-    //     exiting...\n");
-    // goto ferr;
     break;
   default:
     // 5. broken state, should reset everything
-    fprintf(stderr, "Unrecognized/corrupted state file, resetting...\n");
+    fprintf(stderr, "Unrecognized/corrupted state file\n");
   }
 
   print_state_file_type(file.c_str(), state_file_t);
+  fprintf(stderr, "File size: %ld byte(s)\n\n", fsiz);
   print_migrate_target();
 
-  // !TODO
+  ////////////////////
+
+  static CBOX_T val[4096] = {{}};
+
+  switch (state_file_t) {
+  case -1: {
+    // just reset the state
+    fprintf(stderr, "Resetting state file...\n");
+
+    FILE *f = util::try_open(file.c_str(), "wb");
+    size_t wrote = 0;
+    size_t current_wrote = 0;
+    while (wrote < STATE_ELEMENT_COUNT &&
+           (current_wrote = fwrite(val, STATE_ELEMENT_SIZE,
+                                   (wrote + 4096) > STATE_ELEMENT_COUNT
+                                       ? STATE_ELEMENT_COUNT - wrote
+                                       : 4096,
+                                   f)) > 0) {
+      wrote += current_wrote;
+    }
+
+    fprintf(stderr, "Wrote %zu elements to `%s`\n", wrote, file.c_str());
+
+    fclose(f);
+    f = NULL;
+
+    if (wrote != STATE_ELEMENT_COUNT) {
+      fprintf(stderr, "Mismatched written element count, check your code!\n");
+      goto ferr;
+    }
+    break;
+  }
+  case 0: {
+    break;
+  }
+  case 1: {
+    break;
+  }
+  case 2: {
+    break;
+  }
+  case 3: {
+    break;
+  }
+  default:
+    fprintf(stderr, "Nothing to do, exiting...");
+  }
 
 end:
-  fclose(f);
-  f = NULL;
-
   return 0;
 
 ferr:
-  fclose(f);
   return status;
 }
 } // namespace atcboxes::migrate
