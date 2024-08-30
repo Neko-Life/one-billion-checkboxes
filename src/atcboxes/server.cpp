@@ -296,7 +296,11 @@ int run() {
           return;
         }
 
+#ifdef WITH_COLOR
+        publish_global(ws, commands::p_state_wc(i, s));
+#else
         publish_global(ws, commands::p_state(std::string(msg), r));
+#endif // WITH_COLOR
 
         alsfyuwlefasliuyrfgarhbwsgawlrg_a(ws);
         break;
