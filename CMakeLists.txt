@@ -1,14 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(atcboxes
-	VERSION 0.0.1
-	LANGUAGES CXX
-	DESCRIPTION "A Trillion Checkboxes - Web App")
-
-option(DEBUG_SYMBOL "Build ${PROJECT_NAME} with debug symbol" ON)
-option(WITH_COLOR "Build ${PROJECT_NAME} with color support" ON)
-option(ACTUALLY_A_TRILLION "Build ${PROJECT_NAME} with actually a TRILLION checkbox state (requiring 125GB of memory)" OFF)
-
 if (NOT ATCB_VERSION_MAJOR)
 	set(ATCB_VERSION_MAJOR 0)
 endif()
@@ -18,6 +9,15 @@ endif()
 if (NOT ATCB_VERSION_PATCH)
 	set(ATCB_VERSION_PATCH 1)
 endif()
+
+project(atcboxes
+	VERSION "${ATCB_VERSION_MAJOR}.${ATCB_VERSION_MINOR}.${ATCB_VERSION_PATCH}"
+	LANGUAGES CXX
+	DESCRIPTION "A Trillion Checkboxes - Web App")
+
+option(DEBUG_SYMBOL "Build ${PROJECT_NAME} with debug symbol" ON)
+option(WITH_COLOR "Build ${PROJECT_NAME} with color support" ON)
+option(ACTUALLY_A_TRILLION "Build ${PROJECT_NAME} with actually a TRILLION checkbox state (requiring 125GB of memory)" OFF)
 
 message("-- INFO: Configuring ${PROJECT_NAME} version ${ATCB_VERSION_MAJOR}.${ATCB_VERSION_MINOR}.${ATCB_VERSION_PATCH}")
 
