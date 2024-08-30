@@ -366,8 +366,8 @@ void free_state() {
 static void print_help() {
   fprintf(stderr, "Usage: %s [COMMAND] [OPTION...]\n\n", runbin);
 
-  constexpr const char roptfmt[] = "\t%2s, %-8s %-24s %s\n";
-  constexpr const char cfmt[] = "\t%-12s %-24s %s\n";
+  constexpr const char roptfmt[] = "  %2s, %-8s %-24s %s\n";
+  constexpr const char cfmt[] = "  %-12s %-24s %s\n";
 
   fprintf(stderr, "Run options:\n");
   fprintf(stderr, roptfmt, "-h", "--help", "", "Print this message and exit.");
