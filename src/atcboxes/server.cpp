@@ -291,7 +291,7 @@ int run() {
         int r = switch_state(std::stoull(std::string(msg)));
 #endif // WITH_COLOR
 
-        if (r == -1) {
+        if (r < 0) {
           ws_end(ws, 69);
           return;
         }
