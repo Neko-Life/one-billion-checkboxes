@@ -59,7 +59,7 @@ static void print_migrate_target() {
 
 int run(const std::string &file) {
   if (file.empty()) {
-    fprintf(stderr, "No state file specified to migrate!\nExiting...");
+    fprintf(stderr, "No state file specified to migrate!\nExiting...\n");
     return -1;
   }
 
@@ -70,7 +70,6 @@ int run(const std::string &file) {
   // 4. trillion with color
   // 5. broken state, should reset everything
 
-  int status = -1;
   // state file type
   int state_file_t = -1;
 
@@ -84,7 +83,7 @@ int run(const std::string &file) {
     if (fstat(fileno(f), &s) != 0) {
       perror("fstat");
       fclose(f);
-      goto ferr;
+      return -1;
     }
 
     fsiz = s.st_size;
@@ -93,8 +92,13 @@ int run(const std::string &file) {
     f = NULL;
   }
 
+  constexpr size_t BILLION_NO_COLOR_ELEMENT_COUNT =
+      1'000'000'000 / (sizeof(uint64_t) * CHAR_BIT);
+  constexpr size_t SIZE_BYTES_BILLION_NO_COLOR =
+      BILLION_NO_COLOR_ELEMENT_COUNT * sizeof(uint64_t);
+
   switch (fsiz) {
-  case 1'000'000'000 / (sizeof(uint64_t) * CHAR_BIT) * sizeof(uint64_t):
+  case SIZE_BYTES_BILLION_NO_COLOR:
     // 1. billion no color
 #ifdef BUILD_BILLION_NO_COLOR
     no_migration_needed();
@@ -137,7 +141,7 @@ int run(const std::string &file) {
 
   ////////////////////
 
-  static CBOX_T val[4096] = {{}};
+  static CBOX_T TEMP_VAL[4096] = {{}};
 
   switch (state_file_t) {
   case -1: {
@@ -145,10 +149,13 @@ int run(const std::string &file) {
     fprintf(stderr, "Resetting state file...\n");
 
     FILE *f = util::try_open(file.c_str(), "wb");
+    if (f == NULL)
+      return -1;
+
     size_t wrote = 0;
     size_t current_wrote = 0;
     while (wrote < STATE_ELEMENT_COUNT &&
-           (current_wrote = fwrite(val, STATE_ELEMENT_SIZE,
+           (current_wrote = fwrite(TEMP_VAL, STATE_ELEMENT_SIZE,
                                    (wrote + 4096) > STATE_ELEMENT_COUNT
                                        ? STATE_ELEMENT_COUNT - wrote
                                        : 4096,
@@ -163,30 +170,117 @@ int run(const std::string &file) {
 
     if (wrote != STATE_ELEMENT_COUNT) {
       fprintf(stderr, "Mismatched written element count, check your code!\n");
-      goto ferr;
+      return -1;
     }
     break;
   }
   case 0: {
+    static uint64_t TEMP_IN[4096] = {0};
+
+    const std::string writepath = file + ".migration";
+
+    int status = -1;
+    size_t readsiz = 0;
+    size_t curread = 0;
+    size_t wrote = 0;
+    uint64_t temp_bit = 1;
+    size_t tv_idx = 0;
+
+    fprintf(stderr, "Opening new file for writing: %s\n", writepath.c_str());
+    FILE *fout = util::try_open(writepath.c_str(), "wb");
+    if (fout == NULL)
+      return -1;
+
+    FILE *fin = util::try_open(file.c_str(), "rb");
+    if (fin == NULL)
+      goto ferr0;
+
+    // currently only handles BILLION_NO_COLOR to BILLION_WITH_COLOR only
+    // !TODO: handle other cases
+    while ((curread = fread(TEMP_IN, sizeof(uint64_t), 4096, fin)) > 0) {
+      readsiz += curread;
+
+      // put TEMP_IN into new format TEMP_VAL
+      // all element
+      for (size_t j = 0; j < curread; j++) {
+        // convert all bit
+        // all color zeroed
+        do {
+          if (tv_idx == 4096) {
+            // write when it hit the end
+            wrote += fwrite(TEMP_VAL, sizeof(CBOX_T), 4096, fout);
+
+            tv_idx = 0;
+          }
+          TEMP_VAL[tv_idx++].a = TEMP_IN[j] & temp_bit ? 1 : 0;
+
+          temp_bit <<= 1;
+        } while (temp_bit);
+        temp_bit = 1;
+      }
+    }
+
+    // write if theres remaining unwritten element
+    if (tv_idx > 0) {
+      // write when it hit the end
+      wrote += fwrite(TEMP_VAL, sizeof(CBOX_T), tv_idx, fout);
+
+      tv_idx = 0;
+    }
+
+    fprintf(stderr, "Read %zu*%ld=%zu\n", readsiz, sizeof(uint64_t),
+            readsiz * sizeof(uint64_t));
+    fprintf(stderr, "Wrote %zu*%ld=%zu\n", wrote, sizeof(CBOX_T),
+            wrote * sizeof(CBOX_T));
+
+    // state file should have BILLION_NO_COLOR_ELEMENT_COUNT element
+    if (readsiz != BILLION_NO_COLOR_ELEMENT_COUNT) {
+      fprintf(stderr, "Mismatch read size from input file.\n");
+      fprintf(stderr, "New state file is corrupted: %s\n", writepath.c_str());
+      goto ferr1;
+    }
+
+    fprintf(stderr, "State file migrated to: %s\n", writepath.c_str());
+
+    fclose(fin);
+    fin = NULL;
+    fclose(fout);
+    fout = NULL;
     break;
+
+  ferr1:
+    if (fin) {
+      fclose(fin);
+      fin = NULL;
+    }
+  ferr0:
+    if (fout) {
+      fclose(fout);
+      fout = NULL;
+    }
+    return status;
   }
   case 1: {
-    break;
+    // !TODO
+    // break;
   }
   case 2: {
-    break;
+    // !TODO
+    // break;
   }
   case 3: {
+    // !TODO
+    fprintf(stderr,
+            "State file recognized but migration is not implemented.\n");
+    fprintf(stderr, "Exiting...\n");
+    return -1;
     break;
   }
   default:
-    fprintf(stderr, "Nothing to do, exiting...");
+    fprintf(stderr, "Nothing to do, exiting...\n");
   }
 
 end:
   return 0;
-
-ferr:
-  return status;
 }
 } // namespace atcboxes::migrate

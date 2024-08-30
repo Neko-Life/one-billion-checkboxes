@@ -111,9 +111,12 @@ static int load_state(const char *filepath) {
   if (total_el != STATE_ELEMENT_COUNT) {
     fprintf(stderr, "[load_state FATAL] Corrupted state file (total_el != "
                     "STATE_ELEMENT_COUNT)\n");
-    fprintf(stderr, "If this state file ever valid before, try running the "
-                    "migrate command:\n");
+
+    fprintf(stderr, "\nIf this state file ever valid before, try running the "
+                    "migrate command:\n\n");
+
     fprintf(stderr, "\t%s migrate '%s'\n\n", runbin, filepath);
+
     fprintf(stderr, "Exiting...\n");
 
     exit(3);
@@ -128,6 +131,8 @@ static int load_state(const char *filepath) {
 }
 
 static int save_state(const char *filepath) {
+  fprintf(stderr, "[save_state] Saving state to `%s`\n", filepath);
+
   std::lock_guard lk(cb_m);
 
   FILE *f = util::try_open(filepath, "wb");
