@@ -175,6 +175,7 @@ int run(const std::string &file) {
     break;
   }
   case 0: {
+#ifdef BUILD_BILLION_WITH_COLOR
     static uint64_t TEMP_IN[4096] = {0};
 
     const std::string writepath = file + ".migrated-bc";
@@ -259,6 +260,7 @@ int run(const std::string &file) {
       fout = NULL;
     }
     return status;
+#endif // BUILD_BILLION_WITH_COLOR
   }
   case 1: {
     // !TODO
