@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <string>
 
-#define PORT 3000
-
 namespace atcboxes::server {
 
 using App = uWS::App;
@@ -314,9 +312,10 @@ int run() {
 
   app.ws<ws_data_t>("/game", std::move(behavior));
 
-  app.listen(PORT, [](us_listen_socket_t *listen_socket) {
+  int port = get_port();
+  app.listen(port, [port](us_listen_socket_t *listen_socket) {
     if (listen_socket)
-      fprintf(stderr, "[server] Listening on port %d \n", PORT);
+      fprintf(stderr, "[server] Listening on port %d \n", port);
     else {
       fprintf(stderr, "[server ERROR] Listening socket is null\nPORT might "
                       "already in use\n");

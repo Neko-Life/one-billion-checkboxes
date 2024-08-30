@@ -107,6 +107,8 @@ std::pair<CBOX_T const *, size_t> get_state_page(uint64_t page);
 void init_state();
 void free_state();
 
+int get_port();
+
 int run(const int argc, const char *const argv[]);
 
 } // namespace atcboxes

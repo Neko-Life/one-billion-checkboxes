@@ -24,6 +24,7 @@ namespace atcboxes {
 
 const char *statefile = STATE_FILE;
 const char *runbin = "./atcboxes";
+int port = 3000;
 
 static void print_spec() {
   fprintf(stderr, "%s Checkboxes - Server\n", A_TRILLION_STR);
@@ -223,19 +224,21 @@ static void init_main() {
   load_state(statefile);
 }
 
-static void free_main() {
+static void free_main(bool nosave) {
 #ifdef USE_MALLOC
   if (cboxes == NULL) {
     fprintf(stderr, "[free_main ERROR] State freed\n");
     return;
   }
 
-  save_state(statefile);
+  if (nosave == false)
+    save_state(statefile);
 
   free(cboxes);
   cboxes = NULL;
 #else
-  save_state(statefile);
+  if (nosave == false)
+    save_state(statefile);
 #endif // USE_MALLOC
 }
 
@@ -361,6 +364,12 @@ void free_state() {
 #endif
 }
 
+int get_port() {
+  // port only used once on startup
+  // we don't need mutex here
+  return port;
+}
+
 ////////////////////
 
 static void print_help() {
@@ -373,6 +382,7 @@ static void print_help() {
   fprintf(stderr, roptfmt, "-h", "--help", "", "Print this message and exit.");
   fprintf(stderr, roptfmt, "-s", "--state", "</path/to/state.atcb>",
           "Use this state file.");
+  fprintf(stderr, roptfmt, "-p", "--port", "<PORT>", "Listening port.");
   fprintf(stderr, "\n");
 
   fprintf(stderr, "Commands:\n");
@@ -389,7 +399,8 @@ static void print_help() {
   fprintf(stderr, "It is a dummy footer to make this program somewhat more "
                   "legitimate\neven though it won't, and just to make this "
                   "message look good.\n\n"
-                  "But you read it anyway. So, thank you for reading\nand thank you for using this program.");
+                  "But you read it anyway. So, thank you for reading\nand "
+                  "thank you for using this program.");
 }
 
 int run(const int argc, const char *const argv[]) {
@@ -401,6 +412,8 @@ int run(const int argc, const char *const argv[]) {
   bool testing = false;
   bool migrating = false;
   bool getstatefile = false;
+  bool getport = false;
+  bool portset = false;
   std::string migratefile = "";
 
   ARGV_LOOP({
@@ -413,6 +426,24 @@ int run(const int argc, const char *const argv[]) {
       migrating = true;
     } else if (ARGCMP("--state") || ARGCMP("-s")) {
       getstatefile = true;
+    } else if (ARGCMP("--port") || ARGCMP("-p")) {
+      getport = true;
+    } else if (getport) {
+      size_t idx = std::string::npos;
+
+      try {
+        port = std::stoi(ARGVAL, &idx);
+        portset = true;
+      } catch (...) {
+        fprintf(stderr, "Invalid port, exiting...");
+        return -1;
+      }
+
+      getport = false;
+      if (idx == std::string::npos) {
+        fprintf(stderr, "Provide a valid port, exiting...");
+        return -1;
+      }
     } else if (migrating) {
       migratefile = ARGVAL;
       migrating = false;
@@ -421,6 +452,19 @@ int run(const int argc, const char *const argv[]) {
       getstatefile = false;
     }
   })
+
+  if (!portset) {
+    char *envport = getenv("PORT");
+
+    if (envport != NULL)
+      try {
+        port = std::stoi(envport);
+        portset = true;
+      } catch (...) {
+        fprintf(stderr, "Invalid PORT variable, exiting...");
+        return -1;
+      }
+  }
 
   if (migrating || !migratefile.empty())
     return migrate::run(migratefile);
@@ -437,7 +481,8 @@ int run(const int argc, const char *const argv[]) {
     status = server::run();
   }
 
-  free_main();
+  // dont save state when server failed to run
+  free_main(status == 1);
   runtime_cli::shutdown();
 
   return status;
