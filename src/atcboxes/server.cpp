@@ -297,6 +297,7 @@ int run() {
         }
 
 #ifdef WITH_COLOR
+        get_state(i, s);
         publish_global(ws, commands::p_state_wc(i, s));
 #else
         publish_global(ws, commands::p_state(std::string(msg), r));

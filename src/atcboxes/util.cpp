@@ -24,7 +24,7 @@ int parse_cbox_wc(const std::string &msg, uint64_t &i, cbox_t &s) {
   std::vector<uint64_t> l = {};
 
   while (begin != end) {
-    std::string c = (*begin).str();
+    std::string c = begin->str();
 
     try {
       l.push_back(std::stoull(c));

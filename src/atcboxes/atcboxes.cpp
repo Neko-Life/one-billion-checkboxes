@@ -285,11 +285,7 @@ int switch_state(uint64_t i, const CBOX_T &s) {
  * @param s color
  * @return 0 off, 1 on, -1 err
  */
-int get_state(uint64_t i, cbox_t &s) {
-  std::lock_guard lk(cb_m);
-
-  return get_cv(i, s);
-}
+int get_state(uint64_t i, cbox_t &s) { return get_cv(i, s); }
 
 #else
 
