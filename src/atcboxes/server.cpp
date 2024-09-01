@@ -41,19 +41,32 @@ static long long get_current_ts_seed() {
   return std::chrono::high_resolution_clock::now().time_since_epoch().count();
 }
 
-static void on_sigint(int) {
-  constexpr char msg[] = "Received SIGINT\n";
-  constexpr size_t msgsiz = (sizeof(msg) / sizeof(*msg)) - 1;
-  write(STDIN_FILENO, msg, msgsiz);
+static void try_exit() {
   shutdown();
 
   int_count++;
   if (int_count >= 5) {
-    constexpr char msg2[] = "Received 5 SIGINT\nHard exiting...";
+    constexpr char msg2[] = "Received 5 exit signal\nHard exiting...";
     constexpr size_t msgsiz2 = (sizeof(msg2) / sizeof(*msg2)) - 1;
-    write(STDIN_FILENO, msg2, msgsiz2);
+    write(STDERR_FILENO, msg2, msgsiz2);
     exit(-1);
   }
+}
+
+static void on_sigint(int) {
+  constexpr char msg[] = "Received SIGINT\n";
+  constexpr size_t msgsiz = (sizeof(msg) / sizeof(*msg)) - 1;
+  write(STDERR_FILENO, msg, msgsiz);
+
+  try_exit();
+}
+
+static void on_sigterm(int) {
+  constexpr char msg[] = "Received SIGTERM\n";
+  constexpr size_t msgsiz = (sizeof(msg) / sizeof(*msg)) - 1;
+  write(STDERR_FILENO, msg, msgsiz);
+
+  try_exit();
 }
 
 static int get_rand() {
@@ -216,6 +229,7 @@ static void alsfyuwlefasliuyrfgarhbwsgawlrg_a(WS *ws) {
 
 int run() {
   signal(SIGINT, on_sigint);
+  signal(SIGTERM, on_sigterm);
 
   App app;
 
@@ -338,6 +352,7 @@ int run() {
   shutting_down = false;
 
   signal(SIGINT, SIG_DFL);
+  signal(SIGTERM, SIG_DFL);
 
   int temp_s = status;
   status = 0;

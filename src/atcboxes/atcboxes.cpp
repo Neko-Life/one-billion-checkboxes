@@ -271,10 +271,14 @@ int switch_state(uint64_t i, const CBOX_T &s) {
   std::lock_guard lk(cb_m);
   std::lock_guard lj(gv_m);
 
-  uint8_t prev = cboxes[i].a & 1 ? 0xFF : 0xFE;
+  uint8_t prev = cboxes[i].a & 1;
   cboxes[i] = s;
+
   // keep previous active state
-  cboxes[i].a &= prev;
+  if (prev != 0)
+    cboxes[i].a |= 1;
+  else
+    cboxes[i].a &= (~1);
 
   // actually do the toggle
   return switch_c(i, 1);
