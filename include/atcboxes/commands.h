@@ -3,6 +3,7 @@
 
 #include "atcboxes/atcboxes.h"
 #include <string>
+#include <vector>
 
 namespace atcboxes::commands {
 
